@@ -88,6 +88,56 @@
 .pg-aim-label span { font-size: 8px; letter-spacing: 0.08em; color: #e0e6d7; }
 .pg-toast { position: absolute; top: 124px; left: 50%; transform: translate(-50%, -6px); padding: 9px 16px; border-radius: 6px; background: #14271fea; color: #eee9d6; font-size: 12px; opacity: 0; transition: opacity 160ms, transform 160ms; }
 .pg-toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+.pg-root.is-landing .pg-topbar,
+.pg-root.is-landing .pg-panel,
+.pg-root.is-landing .pg-actions,
+.pg-root.is-landing .pg-crosshair,
+.pg-root.is-landing .pg-touch-controls,
+.pg-root.is-landing .pg-capture-hint { visibility: hidden; }
+/* Title screen: only the bottom dock is blurred; the course stays clear. */
+.pg-landing {
+  position: absolute; inset: 0; pointer-events: auto;
+  display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+  gap: 48px; overflow-y: auto; overscroll-behavior: contain;
+  padding: max(42px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  background: linear-gradient(180deg, #0b211d48, transparent 28%, transparent 65%, #081c1875);
+}
+.pg-title-brand { flex-shrink: 0; text-align: center; color: #fff6df; text-shadow: 0 2px 20px #092b2840; }
+.pg-title-brand h2 { margin: 0; font-size: clamp(64px, 8vw, 108px); font-weight: 650; line-height: 1; letter-spacing: -.065em; }
+.pg-title-brand h2 span { color: #e8d4a5; }
+.pg-title-subtitle { margin-top: 14px; padding-left: .3em; font-size: 10px; font-weight: 600; letter-spacing: .3em; }
+.pg-title-menu { width: min(620px, 100%); flex-shrink: 0; animation: pg-menu-enter 450ms ease-out both; }
+.pg-title-dock { display: flex; align-items: center; gap: 28px; padding: 20px 22px; border-radius: 16px; background: linear-gradient(120deg, #122d28c9, #142b27b0); backdrop-filter: blur(14px); box-shadow: 0 12px 40px #061b1926, inset 0 1px #ffffff20; }
+.pg-title-course { flex: 1; min-width: 0; }
+.pg-title-selected { display: flex; align-items: center; gap: 6px; color: #d1dcca; font-size: 8px; font-weight: 600; letter-spacing: .16em; }
+.pg-title-selected i { width: 5px; height: 5px; border-radius: 50%; background: #e8d4a5; }
+.pg-title-course h3 { margin: 7px 0; color: #fff6df; font-size: 23px; font-weight: 550; letter-spacing: -.025em; }
+.pg-title-course p { margin: 0; color: #d0dbd0; font-size: 12px; }
+.pg-title-course p span { padding: 0 5px; color: #9eaea4; }
+.pg-root .pg-title-play { flex-shrink: 0; display: flex; justify-content: center; align-items: center; gap: 26px; min-height: 48px; padding: 0 22px; border-radius: 9px; background: #e8d4a5; color: #19352c; font-size: 13px; font-weight: 650; box-shadow: inset 0 1px #fff7dc70; transition: background 150ms, transform 150ms; }
+.pg-root .pg-title-play:hover:not(:disabled) { background: #f5e3bb; transform: translateY(-1px); }
+.pg-root .pg-title-play:active { transform: translateY(1px); }
+.pg-title-play span { font-size: 19px; font-weight: 400; }
+.pg-title-future { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 14px; color: #d1dcd2; font-size: 10px; text-shadow: 0 1px 6px #071e18; }
+.pg-title-future span { margin-left: 3px; color: #b9c9bb; font-size: 8px; letter-spacing: .1em; text-transform: uppercase; }
+@keyframes pg-menu-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .pg-title-menu { animation: none; } }
+@media (max-width: 600px) {
+  .pg-landing { padding: max(34px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+  .pg-title-brand h2 { font-size: clamp(60px, 18vw, 82px); }
+  .pg-title-subtitle { font-size: 8px; margin-top: 10px; }
+  .pg-title-dock { flex-direction: column; align-items: stretch; gap: 16px; padding: 18px; }
+  .pg-title-course h3 { font-size: 22px; }
+  .pg-root .pg-title-play { justify-content: space-between; }
+}
+@media (max-height: 500px) {
+  .pg-landing { padding-top: max(16px, env(safe-area-inset-top)); padding-bottom: max(12px, env(safe-area-inset-bottom)); gap: 24px; }
+  .pg-title-brand h2 { font-size: 52px; }
+  .pg-title-subtitle { margin-top: 6px; font-size: 8px; }
+  .pg-title-dock { padding: 12px 16px; gap: 12px; }
+  .pg-title-course h3 { font-size: 20px; margin: 5px 0; }
+  .pg-title-future { margin-top: 8px; }
+}
 .pg-final { position: absolute; inset: 0; display: grid; place-items: center; background: #0d1b1766; backdrop-filter: blur(3px); pointer-events: auto; }
 .pg-final-card { width: min(380px, calc(100vw - 32px)); padding: 32px; text-align: center; border-top: 2px solid #e8d4a5; }
 .pg-final-card h2 { margin: 12px 0 18px; font-size: 22px; font-weight: 500; }
@@ -99,7 +149,9 @@
 .pg-final.is-round-complete .pg-final-card { width: min(580px, calc(100vw - 24px)); }
 .pg-final-card { max-height: calc(100vh - 24px); overflow-y: auto; }
 .pg-scorecard { table-layout: fixed; }
-@media (max-width: 480px) { .pg-final.is-round-complete .pg-final-card { padding: 20px 12px; } }
+@media (max-width: 480px) {
+  .pg-final.is-round-complete .pg-final-card { padding: 20px 12px; }
+}
 .pg-scorecard { width: 100%; border-collapse: collapse; margin: 4px 0 22px; font-size: 12px; }
 .pg-scorecard th, .pg-scorecard td { padding: 5px 0; text-align: center; border-bottom: 1px solid #ffffff14; font-weight: 500; }
 .pg-scorecard thead th { color: var(--muted); font-size: 10px; letter-spacing: 0.05em; }

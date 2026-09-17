@@ -10,6 +10,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/home/jay/.npm/_npx
    const response=await route.fetch();await route.fulfill({response,body:(await response.text())+'\nwindow.t={preview,state,camera,renderer,scene,holes,colliders,startHole,nextHole,finishHole,throwDisc,updateCamera,updateHUD};'});
   });
   await page.goto('http://localhost:5173');await page.waitForFunction(()=>!!window.t);
+  assert.equal(await page.locator('#pg-landing').isVisible(),true,'landing screen visible');
+  assert.equal(await page.evaluate(()=>t.preview.active),false,'preview waits for start');
+  await page.locator('#pg-start-round').click();
+  await page.waitForFunction(()=>t.preview.active);
   assert.equal(await page.evaluate(()=>t.preview.active),true,'new round preview');
   const report=await page.evaluate(()=>{
    t.renderer.setAnimationLoop(null);

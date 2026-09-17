@@ -59,6 +59,7 @@ scene.add(basketBeacon);
 
 const state = {
   mode: 'aiming',
+  showLanding: true,
   holeIndex: 0,
   scores: holes.map(() => null),
   discType: 'midrange',
@@ -82,8 +83,20 @@ const state = {
   bank: 0,
   flightHeading: 0,
   spinRate: 0,
+  landingTime: 0,
   finished: false,
 };
+
+const landingFlyover = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(-150, 34, 315),
+  new THREE.Vector3(-178, 42, 90),
+  new THREE.Vector3(-115, 46, -130),
+  new THREE.Vector3(35, 38, -190),
+  new THREE.Vector3(178, 44, -80),
+  new THREE.Vector3(150, 40, 145),
+  new THREE.Vector3(15, 36, 300),
+], true, 'centripetal');
+landingFlyover.arcLengthDivisions = 600;
 
 const touchControls = new Set();
 const touchAim = {
@@ -96,6 +109,7 @@ const touchAim = {
 
 const hud = new HUD({
   holes,
+  onStartRound: startRound,
   onRestart: restartHole,
   onNextHole: nextHole,
   onToggleView: toggleCameraView,
@@ -130,7 +144,7 @@ const preview = new HolePreviewController({
 const hole = () => holes[state.holeIndex];
 
 function selectDisc(type) {
-  if (!Object.hasOwn(DISCS, type) || state.mode !== 'aiming' || state.finished || state.charging) return;
+  if (!Object.hasOwn(DISCS, type) || state.showLanding || state.mode !== 'aiming' || state.finished || state.charging) return;
   if (type === state.discType) return;
   state.discType = type;
   disc.select(type);
@@ -158,7 +172,7 @@ function pointAimAtBasket() {
 }
 
 function toggleCameraView() {
-  if (state.mode !== 'aiming' || state.finished) return;
+  if (state.showLanding || state.mode !== 'aiming' || state.finished) return;
   state.cameraView = state.cameraView === 'first' ? 'third' : 'first';
   state.cameraSnap = true;
   hud.toast(state.cameraView === 'first' ? 'First-person view' : 'Elevated inspection view');
@@ -169,7 +183,7 @@ function isMouseCaptured() {
 }
 
 function requestMouseCapture() {
-  if (state.finished || state.mode !== 'aiming' || isMouseCaptured()) return;
+  if (state.showLanding || state.finished || state.mode !== 'aiming' || isMouseCaptured()) return;
   renderer.domElement.requestPointerLock?.();
 }
 
@@ -180,12 +194,12 @@ function setTouchControl(control, active) {
 }
 
 function resetTouchTilt() {
-  if (state.mode !== 'aiming' || state.finished) return;
+  if (state.showLanding || state.mode !== 'aiming' || state.finished) return;
   state.releaseAngle = 0;
 }
 
 function startTouchThrow() {
-  if (state.mode !== 'aiming' || state.finished || state.charging) return;
+  if (state.showLanding || state.mode !== 'aiming' || state.finished || state.charging) return;
   state.charging = true;
   state.chargeStart = performance.now();
   state.power = 0;
@@ -205,7 +219,7 @@ function cancelTouchThrow() {
 }
 
 function updateTouchAiming(dt) {
-  if (state.mode !== 'aiming' || state.finished) {
+  if (state.showLanding || state.mode !== 'aiming' || state.finished) {
     touchControls.clear();
     touchAim.active = false;
     return;
@@ -215,7 +229,7 @@ function updateTouchAiming(dt) {
 }
 
 function canDragAim() {
-  return state.mode === 'aiming' && !state.finished && !state.charging;
+  return !state.showLanding && state.mode === 'aiming' && !state.finished && !state.charging;
 }
 
 function startDragAim(e) {
@@ -258,6 +272,7 @@ function chargePower(now) {
 
 function throwDisc() {
   if (state.mode !== 'aiming' || state.finished) return;
+  state.showLanding = false;
   const power = clamp(state.power, 0.08, 1);
   const dir = aimDirection();
   const profile = DISCS[state.discType];
@@ -285,9 +300,16 @@ function throwDisc() {
   hud.toast(`Throw ${state.throws} · ${profile.name} · ${Math.round(power * 100)}% power`);
 }
 
+function startRound() {
+  if (!state.showLanding) return;
+  state.scores = holes.map(() => null);
+  startHole(0);
+}
+
 function startHole(index) {
   preview.skip();
   if (isMouseCaptured()) document.exitPointerLock?.();
+  state.showLanding = false;
   state.holeIndex = index;
   state.mode = 'aiming';
   state.discType = 'midrange';
@@ -322,6 +344,7 @@ function startHole(index) {
 }
 
 function restartHole() {
+  if (state.showLanding) return;
   state.scores[state.holeIndex] = null;
   startHole(state.holeIndex);
 }
@@ -512,7 +535,14 @@ function updateCamera(dt) {
   let desired;
   let target;
 
-  if (state.mode === 'flying') {
+  if (state.showLanding) {
+    const loop = (state.landingTime % 28) / 28;
+    desired = landingFlyover.getPointAt(loop);
+    const ahead = landingFlyover.getPointAt((loop + 0.045) % 1);
+    const courseCenter = new THREE.Vector3(0, 0.7, 40);
+    target = ahead.lerp(courseCenter, 0.62);
+    target.y = 1.2 + Math.sin(state.landingTime * 0.35) * 0.25;
+  } else if (state.mode === 'flying') {
     const vel = new THREE.Vector3(Math.sin(state.flightHeading), 0, Math.cos(state.flightHeading));
     desired = state.position.clone().addScaledVector(vel, -8.5).add(new THREE.Vector3(0, 4.2, 0));
     target = state.position.clone().addScaledVector(vel, 6).add(new THREE.Vector3(0, 1.0, 0));
@@ -558,7 +588,7 @@ function updateAimLine() {
   aimLine.geometry.setFromPoints([start, end]);
   aimLine.visible = state.mode === 'aiming' && state.cameraView === 'third' && !state.finished;
   basketBeacon.position.set(hole().basket.x, 0.035, hole().basket.z);
-  basketBeacon.visible = !state.finished;
+  basketBeacon.visible = !state.showLanding && !state.finished;
   basketBeacon.rotation.z += 0.01;
 }
 
@@ -575,7 +605,8 @@ function updateHUD() {
     courseTotal: holes.reduce((sum, h) => sum + h.lengthFeet, 0),
     throws: state.throws,
     discType: state.discType,
-    canSelectDisc: state.mode === 'aiming' && !state.finished && !state.charging,
+    showLanding: state.showLanding,
+    canSelectDisc: !state.showLanding && state.mode === 'aiming' && !state.finished && !state.charging,
     distanceFeet,
     elevationDeg: state.elevation * RAD2DEG,
     releaseLabel: angleLabel(state.releaseAngle),
@@ -592,12 +623,14 @@ function updateHUD() {
 
 let lastTime = performance.now();
 function animate(now) {
-  const dt = Math.min(0.033, (now - lastTime) / 1000 || 0.016);
+  // The first RAF timestamp can precede setup's performance.now(), especially on mobile.
+  const dt = Math.max(0, Math.min(0.033, (now - lastTime) / 1000 || 0.016));
   lastTime = now;
 
   if (state.charging && state.mode === 'aiming') {
     state.power = chargePower(now);
   }
+  if (state.showLanding) state.landingTime += dt;
   updateTouchAiming(dt);
   updatePhysics(dt);
   if (preview.active) preview.update(dt);
@@ -628,7 +661,7 @@ window.addEventListener('mousemove', (e) => {
 
 window.addEventListener('mousedown', (e) => {
   if (performance.now() < touchAim.suppressMouseUntil) return;
-  if (e.button !== 0 || state.mode !== 'aiming' || state.finished) return;
+  if (e.button !== 0 || state.showLanding || state.mode !== 'aiming' || state.finished) return;
   if (e.target.closest?.('button')) return;
   if (!state.mouseCaptured) {
     requestMouseCapture();
@@ -660,7 +693,7 @@ document.addEventListener('pointerlockchange', () => {
 });
 
 window.addEventListener('wheel', (e) => {
-  if (state.mode !== 'aiming' || state.finished) return;
+  if (state.showLanding || state.mode !== 'aiming' || state.finished) return;
   state.releaseAngle = clamp(state.releaseAngle - e.deltaY * 0.0009, -0.38, 0.38);
 }, { passive: true });
 
@@ -670,6 +703,10 @@ window.addEventListener('keydown', (e) => {
     if (type) selectDisc(type);
   }
   if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (state.showLanding && (e.code === 'Enter' || e.code === 'Space')) {
+    e.preventDefault();
+    startRound();
+  }
   if (e.key === 'r' || e.key === 'R') restartHole();
   if (e.key === 'v' || e.key === 'V') toggleCameraView();
   if (e.key === 'n' || e.key === 'N') nextHole();
@@ -681,8 +718,11 @@ window.addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-startHole(0);
+pointAimAtBasket();
+updateSunTarget();
+updateCamera(1);
 updateAimLine();
+updateHUD();
 disc.update(state.position, state.bank, state.spin, false);
 renderer.render(scene, camera);
 renderer.setAnimationLoop(animate);

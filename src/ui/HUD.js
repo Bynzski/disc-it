@@ -13,7 +13,7 @@ const resultLabel = (throws, par) => {
 };
 
 export class HUD {
-  constructor({ holes, onRestart, onToggleView, onSelectDisc, onReleaseMouse, onNextHole, onTouchControl, onTouchThrowStart, onTouchThrowEnd, onTouchThrowCancel, onTouchFlat }) {
+  constructor({ holes, onStartRound, onRestart, onToggleView, onSelectDisc, onReleaseMouse, onNextHole, onTouchControl, onTouchThrowStart, onTouchThrowEnd, onTouchThrowCancel, onTouchFlat }) {
     this.holes = holes;
     this.root = document.createElement('div');
     this.root.className = 'pg-root';
@@ -74,6 +74,27 @@ export class HUD {
       <div class="pg-capture-hint" id="pg-capture-hint">Click course to aim</div>
       <div class="pg-toast" id="pg-toast" role="status"></div>
 
+      <section class="pg-landing" id="pg-landing" role="dialog" aria-modal="true" aria-labelledby="pg-landing-title">
+        <header class="pg-title-brand">
+          <h2 id="pg-landing-title">Disc It<span aria-hidden="true">.</span></h2>
+          <div class="pg-title-subtitle">PARK DISC GOLF</div>
+        </header>
+        <div class="pg-title-menu">
+          <div class="pg-title-dock" aria-label="Course selection">
+            <div class="pg-title-course">
+              <span class="pg-title-selected"><i aria-hidden="true"></i> SELECTED COURSE</span>
+              <h3>Tocobaga Nine</h3>
+              <p>${holes.length} Holes <span>•</span> Par ${holes.reduce((sum, h) => sum + h.par, 0)} <span>•</span> ${holes.reduce((sum, h) => sum + h.lengthFeet, 0)} ft</p>
+            </div>
+            <button type="button" id="pg-start-round" class="pg-title-play" aria-keyshortcuts="Enter Space" aria-label="Play course: Tocobaga Nine">Play Course <span aria-hidden="true">→</span></button>
+          </div>
+          <div class="pg-title-future" aria-disabled="true">
+            <svg aria-hidden="true" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="7" width="10" height="7" rx="2"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg>
+            More courses <span>Coming soon</span>
+          </div>
+        </div>
+      </section>
+
       <div class="pg-final" id="pg-final" hidden role="dialog" aria-modal="true" aria-labelledby="pg-final-title">
         <div class="pg-final-card pg-glass">
           <div class="pg-eyebrow" id="pg-final-eyebrow">TOCOBAGA · HOLE 01</div>
@@ -99,7 +120,7 @@ export class HUD {
       'hole-number', 'hole-name', 'hole-meta', 'throws', 'distance', 'crosshair', 'cross-angle',
       'tilt-disc', 'disc-ratings', 'elevation', 'power-value', 'power-fill', 'throw-label',
       'status', 'view-toggle', 'view-label', 'restart', 'cursor', 'capture-hint',
-      'touch-throw', 'touch-power', 'touch-flat', 'toast', 'final', 'final-eyebrow', 'final-result', 'final-score', 'final-restart', 'next', 'scorecard', 'score-total', 'final-title',
+      'touch-throw', 'touch-power', 'touch-flat', 'toast', 'landing', 'start-round', 'final', 'final-eyebrow', 'final-result', 'final-score', 'final-restart', 'next', 'scorecard', 'score-total', 'final-title',
     ].map(id => [id, get(id)]));
     this.scoreCells = [...this.root.querySelectorAll('.pg-score-cell')];
     this.powerBar = this.root.querySelector('.pg-power');
@@ -113,6 +134,7 @@ export class HUD {
     this.el.cursor.addEventListener('click', () => onReleaseMouse?.());
     this.el['final-restart'].addEventListener('click', () => onRestart?.());
     this.el.next.addEventListener('click', () => onNextHole?.());
+    this.el['start-round'].addEventListener('click', () => onStartRound?.());
 
     const setTouchPressed = (button, pressed, event) => {
       event?.preventDefault();
@@ -164,6 +186,9 @@ export class HUD {
     if (!data) return;
     const profile = DISCS[data.discType];
     const hole = data.hole;
+    const isLanding = data.showLanding;
+    this.root.classList.toggle('is-landing', isLanding);
+    this.el.landing.hidden = !isLanding;
     this.root.style.setProperty('--active-disc', profile.color);
     for (const button of this.discButtons) {
       button.setAttribute('aria-pressed', String(button.dataset.disc === data.discType));
@@ -178,7 +203,7 @@ export class HUD {
     this.el.elevation.textContent = `${Math.round(data.elevationDeg)}°`;
     this.el['cross-angle'].textContent = data.releaseLabel === 'Flat' ? '0° Flat' : data.releaseLabel;
     this.el['tilt-disc'].style.transform = `translate(-50%, -50%) rotate(${-data.releaseDeg || 0}deg)`;
-    this.el.crosshair.hidden = data.mode !== 'aiming' || data.finished;
+    this.el.crosshair.hidden = isLanding || data.mode !== 'aiming' || data.finished;
     const power = Math.round(data.power * 100);
     this.root.style.setProperty('--touch-power', `${power}%`);
     this.el['power-fill'].style.width = `${power}%`;
@@ -189,14 +214,14 @@ export class HUD {
     this.el.status.textContent = data.finished ? 'COMPLETE' : data.mode === 'flying' ? 'IN FLIGHT' : data.charging ? (data.powerRising ? '↑ RISING' : '↓ FALLING') : 'READY';
     this.el['view-label'].textContent = data.cameraView === 'first' ? 'Elevated' : 'First person';
     this.el['view-toggle'].setAttribute('aria-pressed', String(data.cameraView === 'third'));
-    const canAim = data.mode === 'aiming' && !data.finished;
+    const canAim = !isLanding && data.mode === 'aiming' && !data.finished;
     this.el['view-toggle'].disabled = !canAim;
     this.el.cursor.disabled = !data.mouseCaptured;
     for (const button of this.touchButtons) button.disabled = !canAim;
     this.el['touch-flat'].disabled = !canAim;
     this.el['touch-throw'].disabled = !canAim;
-    this.el['capture-hint'].hidden = data.mouseCaptured || data.mode !== 'aiming' || data.finished;
-    this.el.final.hidden = !data.finished;
+    this.el['capture-hint'].hidden = isLanding || data.mouseCaptured || data.mode !== 'aiming' || data.finished;
+    this.el.final.hidden = isLanding || !data.finished;
     this.el['final-eyebrow'].textContent = `TOCOBAGA · HOLE ${String(hole.id).padStart(2, '0')}`;
     const isLast = data.holeIndex + 1 >= data.holeCount;
     this.el.next.textContent = '';
