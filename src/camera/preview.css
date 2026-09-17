@@ -1,0 +1,13 @@
+.pg-root.is-preview .pg-panel,
+.pg-root.is-preview .pg-actions,
+.pg-root.is-preview .pg-crosshair,
+.pg-root.is-preview .pg-stats,
+.pg-root.is-preview .pg-toast,
+.pg-root.is-preview .pg-capture-hint { visibility: hidden; }
+.pg-preview { position: fixed; inset: 0; z-index: 50; pointer-events: none; }
+.pg-preview[hidden] { display: none; }
+.pg-preview-fade { position: absolute; inset: 0; background: #101c1a; opacity: 0; }
+.pg-preview-caption { position: absolute; bottom: 7%; left: 50%; transform: translateX(-50%); width: min(560px, 88vw); text-align: center; color: #f3efdc; text-shadow: 0 2px 5px #000; font: 14px system-ui, sans-serif; }
+.pg-preview-caption > span { font-size: 11px; letter-spacing: .2em; }
+.pg-preview-route { margin: 12px 0; line-height: 1.5; }
+.pg-preview-caption small { opacity: .8; }
