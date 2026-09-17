@@ -81,6 +81,95 @@ export const HOLE_DATA = [
   },
 ];
 
+// Back nine: an inner loop from the plaza, down the west interior, around
+// the meadow, and home beside the picnic commons. Front-nine data stays above.
+const BACK_NINE = [
+  {
+    id: 10, name: 'Plaza Passage', par: 3,
+    route: [[-43, 259], [-44, 230], [-33, 171]],
+    width: 8, spacing: 11, trees: 1.05,
+    note: 'Leave the plaza along the parking edge. Keep the disc low past the picnic area.',
+    guardians: [[-25, 169, 1.25], [-40, 163, 1.1]],
+    previewPath: [[-43, 4.5, 263], [-44, 5, 248], [-44, 5.5, 230], [-39, 5.2, 202], [-35, 3.8, 183]],
+  },
+  {
+    id: 11, name: 'Pine Hook', par: 4,
+    route: [[-43, 155], [-81, 120], [-78, 65]],
+    width: 8, spacing: 9, trees: 1.1,
+    note: 'Shape left into the pine clearing. A placed drive opens the second lane.',
+    groves: [[[-54, 130], [-62, 100], [-55, 87], [-42, 124]]],
+    guardians: [[-86, 62, 1.3], [-71, 59, 1.25]],
+    previewPath: [[-40, 4.5, 159], [-61, 5.5, 138], [-81, 5.8, 120], [-80, 5, 94], [-79, 3.8, 77]],
+  },
+  {
+    id: 12, name: 'Palmetto Elbow', par: 4,
+    route: [[-79, 48], [-62, -7], [-20, -27]],
+    width: 8, spacing: 10, trees: 1.1,
+    note: 'Turn right through the clearing. Palmetto rough discourages cutting the corner.',
+    groves: [[[-57, 19], [-39, 0], [-32, 2], [-45, 29]]],
+    guardians: [[-13, -21, 1.2], [-20, -36, 1.15]],
+    previewPath: [[-80, 4.5, 52], [-70, 5.5, 23], [-62, 5.8, -7], [-42, 5, -18], [-31, 3.8, -22]],
+  },
+  {
+    id: 13, name: 'Meadow Bend', par: 4,
+    route: [[-5, -37], [52, -61], [78, -111]],
+    width: 12, spacing: 20, trees: 1.45,
+    note: 'Open drive beside the picnic grove. Land at the bend for a protected approach.',
+    blockers: [[50, -81, 1.6]],
+    guardians: [[70, -115, 1.3], [86, -115, 1.4]],
+    previewPath: [[-9, 4.8, -35], [22, 6, -49], [52, 6, -61], [65, 5, -87], [72, 3.8, -100]],
+  },
+  {
+    id: 14, name: 'Sawgrass Window', par: 3,
+    route: [[94, -107], [94, -51], [102, -4]],
+    width: 7, spacing: 8, trees: .95,
+    note: 'A long low-ceiling window. Controlled height beats a full-power sky shot.',
+    guardians: [[109, -3, 1.25], [97, 4, 1.15]],
+    previewPath: [[94, 4.2, -111], [94, 5, -83], [94, 5, -51], [98, 4.5, -27], [100, 3.8, -16]],
+  },
+  {
+    id: 15, name: 'Cypress Choice', par: 4,
+    route: [[84, 2], [62, 68], [67, 151]],
+    alternate: [[84, 2], [76, 22], [78, 58], [91, 85], [67, 151]],
+    width: 8, spacing: 12, trees: 1.2,
+    note: 'Left is the wider landing lane; right rewards a shaped drive beside the overlook. No forced water carry.',
+    groves: [[[75, 43], [83, 47], [83, 94], [75, 107], [72, 84]]],
+    guardians: [[59, 150, 1.25], [73, 157, 1.2]],
+    previewPath: [[85, 4.5, -2], [73, 5.8, 35], [62, 6, 68], [64, 5.5, 108], [66, 3.8, 139]],
+  },
+  {
+    id: 16, name: 'Picnic Fade', par: 3,
+    route: [[67, 170], [60, 207], [35, 232]],
+    width: 8, spacing: 12, trees: 1.1,
+    note: 'A left-finishing line to a tucked pin. Avoid fading early into the inside grove.',
+    blockers: [[47, 205, 1.6]],
+    guardians: [[39, 240, 1.1], [27, 233, 1.2]],
+    previewPath: [[68, 4.5, 166], [64, 5.5, 189], [60, 5.8, 207], [51, 4.8, 216], [44, 3.8, 224]],
+  },
+  {
+    id: 17, name: 'Needle Palm', par: 3,
+    route: [[5, 209], [-3, 160], [-10, 96]],
+    width: 7, spacing: 9, trees: .95,
+    note: 'Place a flat drive between palmetto banks, then thread the second window to the pin.',
+    guardians: [[-17, 93, 1.1], [-3, 89, 1.2]],
+    previewPath: [[6, 4.2, 213], [2, 5, 188], [-3, 5, 160], [-7, 4.3, 126], [-8, 3.8, 108]],
+  },
+  {
+    id: 18, name: 'Commons Home', par: 4,
+    route: [[-7, 77], [25, 108], [38, 161], [28, 197], [4, 244]],
+    width: 8, spacing: 14, trees: 1.3,
+    note: 'Three landing windows lead home to the commons. Place the opening drive, then commit down the final lane.',
+    blockers: [[21, 139, 1.5]],
+    guardians: [[-4, 245, 1.3], [10, 251, 1.25]],
+    previewPath: [[-10, 4.8, 74], [9, 5.7, 92], [25, 6, 108], [38, 6, 161], [28, 5.6, 197], [15, 4.7, 222], [9, 3.8, 233]],
+  },
+];
+for (const data of BACK_NINE) {
+  data.lengthFeet = Math.round(data.route.slice(1).reduce((sum, b, i) =>
+    sum + Math.hypot(b[0] - data.route[i][0], b[1] - data.route[i][1]), 0) * 3.05);
+  HOLE_DATA.push(data);
+}
+
 export const COURSE_BOUNDS = { minX: -205, maxX: 225, minZ: -210, maxZ: 335 };
 export const WATER = [
   { x: 151, z: 22, radius: 21, holes: [7] },

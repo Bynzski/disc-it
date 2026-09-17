@@ -18,7 +18,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/home/jay/.npm/_npx
   const report=await page.evaluate(()=>{
    t.renderer.setAnimationLoop(null);
    const report=[];
-   for(let h=0;h<9;h++){
+   for(let h=0;h<t.holes.length;h++){
     t.startHole(h);const p=t.preview;const collisions=[];let minY=Infinity,maxY=0;
     for(let i=0;i<=400;i++){
      const {position:v,target}=p.sample(i/400);minY=Math.min(minY,v.y);maxY=Math.max(maxY,v.y);
@@ -67,16 +67,16 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/home/jay/.npm/_npx
   await page.mouse.down();await page.waitForTimeout(100);await page.mouse.up();
   assert.equal(await page.evaluate(()=>t.state.throws),1);assert.equal(await page.evaluate(()=>t.preview.active),false);
   await page.evaluate(()=>{t.finishHole();t.nextHole();});assert.equal(await page.evaluate(()=>t.preview.active),true);
-  await page.evaluate(()=>{t.startHole(8);t.preview.skip();t.finishHole();t.nextHole();});
+  await page.evaluate(()=>{t.startHole(t.holes.length-1);t.preview.skip();t.finishHole();t.nextHole();});
   assert.equal(await page.evaluate(()=>t.state.holeIndex),0);assert.equal(await page.evaluate(()=>t.preview.active),true);
   // Render midpoint and final basket framing for every preview.
-  for(let i=0;i<9;i++){
+  for(let i=0;i<report.length;i++){
    for(const [label,fraction]of [['mid',.5],['basket',1]]){
     await page.evaluate(({i,fraction})=>{t.startHole(i);t.preview.update(t.preview.travelDuration*fraction);t.renderer.render(t.scene,t.camera);},{i,fraction});
     await page.screenshot({path:`/tmp/preview-${i+1}-${label}.png`});
    }
   }
   assert.deepEqual(errors,[]);
-  console.log('PASS: nine preview paths, obstacle clearance, automatic end, skip keys/click, input isolation, replay/advance/new round, gameplay restoration.');
+  console.log('PASS: eighteen preview paths, obstacle clearance, automatic end, skip keys/click, input isolation, replay/advance/new round, gameplay restoration.');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1)});

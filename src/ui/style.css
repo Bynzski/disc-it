@@ -146,7 +146,13 @@
 .pg-final-card button { border: 1px solid #ffffff35; padding: 11px 20px; border-radius: 6px; font-size: 13px; }
 .pg-final-card kbd { margin-right: 8px; }
 .pg-final-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-.pg-final.is-round-complete .pg-final-card { width: min(580px, calc(100vw - 24px)); }
+.pg-final.is-round-complete .pg-final-card { width: min(820px, calc(100vw - 24px)); }
+.pg-score-scroll { overflow-x: auto; }
+.pg-score-hint { display: none; }
+@media (max-width: 760px) {
+  .is-round-complete .pg-score-hint { display: block; font-size: 11px; margin: 0 0 14px; }
+}
+.pg-scorecard:not([hidden]) { min-width: 680px; }
 .pg-final-card { max-height: calc(100vh - 24px); overflow-y: auto; }
 .pg-scorecard { table-layout: fixed; }
 @media (max-width: 480px) {

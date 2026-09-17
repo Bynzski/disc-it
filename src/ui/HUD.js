@@ -23,7 +23,7 @@ export class HUD {
         <div class="pg-course pg-glass">
           <div class="pg-hole-number" id="pg-hole-number">01</div>
           <div>
-            <div class="pg-eyebrow">TOCOBAGA NINE</div>
+            <div class="pg-eyebrow">TOCOBAGA PARK</div>
             <h1 id="pg-hole-name">No. 1</h1>
             <div class="pg-meta" id="pg-hole-meta">Par 3 · 282 ft</div>
           </div>
@@ -83,10 +83,10 @@ export class HUD {
           <div class="pg-title-dock" aria-label="Course selection">
             <div class="pg-title-course">
               <span class="pg-title-selected"><i aria-hidden="true"></i> SELECTED COURSE</span>
-              <h3>Tocobaga Nine</h3>
+              <h3>Tocobaga Park</h3>
               <p>${holes.length} Holes <span>•</span> Par ${holes.reduce((sum, h) => sum + h.par, 0)} <span>•</span> ${holes.reduce((sum, h) => sum + h.lengthFeet, 0)} ft</p>
             </div>
-            <button type="button" id="pg-start-round" class="pg-title-play" aria-keyshortcuts="Enter Space" aria-label="Play course: Tocobaga Nine">Play Course <span aria-hidden="true">→</span></button>
+            <button type="button" id="pg-start-round" class="pg-title-play" aria-keyshortcuts="Enter Space" aria-label="Play course: Tocobaga Park">Play Course <span aria-hidden="true">→</span></button>
           </div>
           <div class="pg-title-future" aria-disabled="true">
             <svg aria-hidden="true" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="7" width="10" height="7" rx="2"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg>
@@ -101,12 +101,13 @@ export class HUD {
           <h2 id="pg-final-title">Hole complete</h2>
           <div class="pg-final-result" id="pg-final-result">PAR</div>
           <p id="pg-final-score"></p>
-          <table class="pg-scorecard" id="pg-scorecard">
+          <div class="pg-score-scroll" tabindex="0" role="region" aria-label="18-hole scorecard; scroll horizontally for all holes"><table class="pg-scorecard" id="pg-scorecard">
             <thead><tr><th></th>${holes.map((_, i) => `<th>${i + 1}</th>`).join('')}<th>TOT</th></tr></thead>
             <tbody>
               <tr><th scope="row">Par</th>${holes.map(h => `<td>${h.par}</td>`).join('')}<td>${holes.reduce((sum, h) => sum + h.par, 0)}</td></tr>
               <tr><th>Score</th>${holes.map(() => '<td class="pg-score-cell">–</td>').join('')}<td class="pg-total" id="pg-score-total">–</td></tr>
-            </tbody></table>
+            </tbody></table></div>
+          <p class="pg-score-hint">Scroll scorecard to view all 18 holes →</p>
           <div class="pg-final-actions">
             <button type="button" id="pg-next" aria-keyshortcuts="n"><kbd>N</kbd> Next hole</button>
             <button type="button" id="pg-final-restart" aria-keyshortcuts="r"><kbd>R</kbd> Replay</button>
@@ -239,7 +240,7 @@ export class HUD {
       const throws = roundComplete ? total : data.throws;
       const diff = throws - par;
       const relative = diff === 0 ? 'Even' : `${diff > 0 ? '+' : ''}${diff}`;
-      this.el['final-eyebrow'].textContent = roundComplete ? 'TOCOBAGA NINE · ROUND SCORECARD' : `TOCOBAGA · HOLE ${hole.id}`;
+      this.el['final-eyebrow'].textContent = roundComplete ? 'TOCOBAGA PARK · ROUND SCORECARD' : `TOCOBAGA · HOLE ${hole.id}`;
       this.el['final-result'].textContent = roundComplete ? relative : resultLabel(throws, par);
       this.el['final-score'].textContent = `${throws} throws · Par ${par} · ${relative}`;
       this.scoreCells.forEach((cell, i) => {

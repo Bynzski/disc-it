@@ -39,20 +39,21 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/home/jay/.npm/_npx
    return {hole:h.id,par:h.par,finished:s.finished,score:s.throws,directHits,directRemaining:Math.round(directRemaining),trace};
   };});
   const rows=[];
-  for(let i=0;i<9;i++){
+  const count=await page.evaluate(()=>t.holes.length);
+  for(let i=0;i<count;i++){
    const row=await page.evaluate(()=>playHole());rows.push(row);console.log(JSON.stringify(row));
    assert(row.finished,`Hole ${i+1} cannot complete`);
-   if(i<8){await page.locator('#pg-next').click();await page.waitForFunction(index=>t.state.holeIndex===index,i+1);}
+   if(i<count-1){await page.locator('#pg-next').click();await page.waitForFunction(index=>t.state.holeIndex===index,i+1);}
   }
   assert.equal(await page.locator('#pg-final-title').innerText(),'Round complete');
   assert.equal(await page.locator('#pg-score-total').innerText(),String(rows.reduce((sum,r)=>sum+r.score,0)));
   await page.screenshot({path:'/tmp/redesigned-scorecard.png'});
   await page.locator('#pg-next').click();
-  assert.deepEqual(await page.evaluate(()=>t.state.scores),Array(9).fill(null));
+  assert.deepEqual(await page.evaluate(()=>t.state.scores),Array(count).fill(null));
   await page.evaluate(()=>{t.updateCamera(1);t.renderer.render(t.scene,t.camera);t.updateHUD();});
   await page.screenshot({path:'/tmp/redesigned-tee.png'});
   assert.deepEqual(errors,[]);
   require('node:fs').writeFileSync('/tmp/redesigned-round.json',JSON.stringify(rows,null,2));
-  console.log('PASS: nine real tee-to-basket physics sequences, next-hole UI, final totals, new round.');
+  console.log('PASS: eighteen real tee-to-basket physics sequences, next-hole UI, final totals, new round.');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1)});

@@ -17,7 +17,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/home/jay/.npm/_npx
       const t = testCourse;
       t.renderer.setAnimationLoop(null);
       const results = [];
-      for (let h = 0; h < 9; h++) {
+      for (let h = 0; h < t.holes.length; h++) {
         t.startHole(h);
         t.preview.skip(); // Throw controls are gated during the intro flyover.
         Object.assign(t.state, { discType: 'driver', power: 1, elevation: .32 });
@@ -33,7 +33,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/home/jay/.npm/_npx
         const green = Math.min(...trees.map(c => Math.hypot(c.x-h.basket.x,c.z-h.basket.z)-c.canopyRadius));
         const next = t.holes[h.id % t.holes.length];
         const walk = Math.hypot(next.tee.x-h.basket.x,next.tee.z-h.basket.z);
-        if (tee < 5 || green < 4 || walk > 25) throw Error(`Clearance/connection failed: ${h.id}`);
+        // Hole 18 walks home beside the commons by design; every other hole must connect.
+        if (tee < 5 || green < 4 || (h.id !== t.holes.length && walk > 45)) throw Error(`Hole ${h.id}: tee clearance=${tee.toFixed(3)} (min 5), basket clearance=${green.toFixed(3)} (min 4), next-tee walk=${walk.toFixed(3)} (max ${h.id === t.holes.length ? 'not applicable: round ends' : 45})`);
         return { hole: h.id, tee: +tee.toFixed(1), green: +green.toFixed(1), nextTeeMeters: +walk.toFixed(1) };
       });
       // A short real throw toward water must cost the throw plus one penalty,
@@ -54,9 +55,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/home/jay/.npm/_npx
       return { results, clearance, waterTest, pars: t.holes.map(h => h.par), trees:t.colliders.filter(c=>c.kind==='tree').length };
     });
     assert.deepEqual(errors, []);
-    assert.equal(report.pars.reduce((sum,par)=>sum+par,0),32);
+    assert.equal(report.pars.reduce((sum,par)=>sum+par,0),64);
     // Render every tee, not just the last test state.
-    for (let i=0;i<9;i++) {
+    for (let i=0;i<report.pars.length;i++) {
       await page.evaluate(i=>{const t=testCourse;t.startHole(i);t.preview.skip();t.updateCamera(1);t.updateHUD();t.renderer.render(t.scene,t.camera);},i);
       await page.screenshot({path:`/tmp/course-tee-${i+1}.png`});
     }

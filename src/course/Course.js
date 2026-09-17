@@ -2,10 +2,11 @@ import * as THREE from 'three';
 import { addBoulder } from './Boulder.js';
 import { createBin, createParkSign, createPicnicTable, createShelter, placeAsset } from './ParkAssets.js';
 import { makeBasket } from './Basket.js';
+import { addEnvironmentDetails } from './EnvironmentAssets.js';
 import { HOLE_DATA, COURSE_BOUNDS, WATER, distanceToSegment, inPolygon } from './Layout.js';
 
 export { COURSE_BOUNDS };
-export const COURSE_NAME = 'Tocobaga Nine';
+export const COURSE_NAME = 'Tocobaga Park';
 export const COURSE_BLB = 'An original city-park routing inspired by coastal Florida';
 const material = color => new THREE.MeshStandardMaterial({ color, roughness: .9 });
 const wood = material(0x745438), leaves = material(0x39673d), rough = material(0x73924f);
@@ -47,13 +48,20 @@ export function buildCourse(scene) {
 
   // Every planting has a role: lane edge, shortcut-blocking grove or guardian.
   // Protect every tee and putting circle, including those of adjacent holes.
-  const clear = (x, z, radius) => holes.every(h =>
+  const clear = (x, z, radius, frontOnly = false) => (frontOnly ? holes.slice(0, 9) : holes).every(h =>
     Math.hypot(x-h.tee.x, z-h.tee.z) > radius + 5 &&
     Math.hypot(x-h.basket.x, z-h.basket.z) > radius + 4);
   const occupied = [];
+  let environment;
+  const overlapsPark = (x, z, radius) => environment?.placements.some(p =>
+    Math.hypot(x-p.x, z-p.z) < radius+p.radius+1);
   function tree(x, z, scale = 1, role = 'edge', holeId = 0) {
     const crownR = 2.2 * scale;
-    if (!clear(x, z, crownR) || occupied.some(p => Math.hypot(x-p[0], z-p[1]) < 2.3)) return;
+    if (!clear(x, z, crownR, holeId <= 9) || occupied.some(p => Math.hypot(x-p[0], z-p[1]) < 2.3)) return;
+    // New planting must never change a front-nine lane (including alternates),
+    // or close a neighboring back-nine fairway.
+    if (holeId > 9 && holes.some(h => h.id !== holeId && nearRoute(x, z, h, h.width * .75 + crownR + 1))) return;
+    if (holeId > 9 && overlapsPark(x, z, crownR)) return;
     occupied.push([x, z]);
     const trunkH = 4.5 * scale, trunkR = .4 * scale;
     const trunk = new THREE.Mesh(trunkGeo, wood);
@@ -66,10 +74,23 @@ export function buildCourse(scene) {
       trunkHeight: trunkH, canopyBottom: trunkH-crownR, height: trunkH+crownR, role, holeId });
   }
   function bush(x, z, holeId) {
-    if (!clear(x, z, 1.4)) return;
-    const mesh = new THREE.Mesh(crownGeo, leaves);
-    mesh.position.set(x, .85, z); mesh.scale.set(1.5, 1.05, 1.5);
-    mesh.castShadow = true; scene.add(mesh);
+    if (!clear(x, z, 1.4, holeId <= 9)) return;
+    if (holeId > 9 && holes.some(h => h.id !== holeId && nearRoute(x, z, h, h.width * .75 + 2.4))) return;
+    if (holeId > 9 && overlapsPark(x, z, 1.4)) return;
+    if (holeId > 9) {
+      // Saw-palmetto fans: low solid rough uses the existing underbrush collider.
+      for (let i = 0; i < 7; i++) {
+        const a = i / 7 * Math.PI * 2;
+        const frond = new THREE.Mesh(crownGeo, leaves);
+        frond.position.set(x + Math.sin(a)*.55, .85, z + Math.cos(a)*.55);
+        frond.scale.set(.35, .22, .95); frond.rotation.set(-.55, a, 0);
+        frond.castShadow = true; scene.add(frond);
+      }
+    } else {
+      const mesh = new THREE.Mesh(crownGeo, leaves);
+      mesh.position.set(x, .85, z); mesh.scale.set(1.5, 1.05, 1.5);
+      mesh.castShadow = true; scene.add(mesh);
+    }
     colliders.push({ kind: 'tree', x, z, trunkRadius: 1.4, canopyRadius: 1.4,
       canopyBottom: 0, trunkHeight: 1, height: 1.9, role: 'underbrush', holeId });
   }
@@ -77,7 +98,7 @@ export function buildCourse(scene) {
     return [data.route, data.alternate].filter(Boolean).some(route =>
       route.slice(1).some((b, i) => distanceToSegment(x, z, route[i], b) < margin));
   }
-  for (const data of holes) {
+  function buildHole(data) {
     const paths = [data.route, data.alternate].filter(Boolean);
     for (const route of paths) {
       for (let j = 1; j < route.length; j++) {
@@ -91,7 +112,7 @@ export function buildCourse(scene) {
             const z = a[1]+dz*d/length+dx/length*data.width*side;
             // Do not block the other arm of a dogleg or an alternate window.
             if (!nearRoute(x, z, data, data.width*.7)) tree(x, z, data.trees, 'edge', data.id);
-            if ([2, 8].includes(data.id)) {
+            if ([2, 8, 12, 17].includes(data.id)) {
               const ox = x-dz/length*5*side, oz = z+dx/length*5*side;
               if (!nearRoute(ox, oz, data, data.width*.7)) {
                 tree(ox, oz, data.trees*1.2, 'rough', data.id);
@@ -124,9 +145,13 @@ export function buildCourse(scene) {
     placeAsset(scene, createParkSign(`${data.id}  ${data.name}`, `PAR ${data.par}  /  ${data.lengthFeet} FT`), sx, sz, angle+Math.PI);
     baskets.push(makeBasket(scene, data.basket));
     // Short connecting paths make the routing read as one property.
-    const next = holes[data.id % holes.length];
-    strip(scene, [data.basket.x, data.basket.z], [next.tee.x, next.tee.z], 1.7, sand, .021);
+    if (data.id < holes.length) {
+      const next = holes[data.id];
+      strip(scene, [data.basket.x, data.basket.z], [next.tee.x, next.tee.z], 1.7, sand, .021);
+    }
   }
+
+  holes.slice(0, 9).forEach(buildHole);
 
   // Water landing: one penalty stroke and a rethrow from the prior lie.
   // Shoreline rocks/cypress frame the carry without obstructing the dry route.
@@ -138,7 +163,7 @@ export function buildCourse(scene) {
     for (let i = 0; i < 10; i++) {
       const angle = i/10*Math.PI*2;
       const x = pond.x+Math.sin(angle)*(pond.radius+1.8), z = pond.z+Math.cos(angle)*(pond.radius+1.8);
-      if (clear(x, z, 2) && !holes.some(h => nearRoute(x, z, h, 6))) {
+      if (clear(x, z, 2, true) && !holes.slice(0, 9).some(h => nearRoute(x, z, h, 6))) {
         addBoulder(scene, colliders, { x, z, size: [1.7, 1.25, 1.5] });
         tree(x+2.5, z+2.5, 1.4, 'shoreline', pond.holes[0]);
       }
@@ -154,10 +179,15 @@ export function buildCourse(scene) {
   for (let x = -83; x < -48; x += 5) box(scene, x, .035, 241, .12, .02, 11, sand);
   for (let x = -91; x <= -47; x += 4) box(scene, x, .8, 254, .16, 1.6, .16, wood);
   box(scene, -69, 1.2, 254, 44, .14, .14, wood);
-  placeAsset(scene, createParkSign('FOUNDERS GREEN', 'TOCOBAGA NINE  /  PAR 32'), -84, 286, Math.PI/2);
+  placeAsset(scene, createParkSign('FOUNDERS GREEN', 'TOCOBAGA PARK  /  FRONT NINE'), -84, 286, Math.PI/2);
   // Signature backdrop behind the final green, with a clear putting circle.
   box(scene, -85, 2.3, 282, .35, 4.6, .35, wood);
   box(scene, -85, 2.3, 291, .35, 4.6, .35, wood);
   box(scene, -85, 4.5, 286.5, .45, .35, 9.5, wood);
-  return { holes, colliders, baskets, water: WATER };
+  // Freeze the established park before adding the inner loop. New planting
+  // respects these prefab footprints instead of silently deleting park assets.
+  environment = addEnvironmentDetails(scene, holes.slice(0, 9), colliders);
+  holes.slice(9).forEach(buildHole);
+  strip(scene, [4, 244], [10, 235], 1.7, sand, .021);
+  return { holes, colliders, baskets, water: WATER, environment };
 }
