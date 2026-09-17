@@ -1,6 +1,7 @@
 :root { color-scheme: dark; }
 .pg-root {
   --active-disc: #73b8c5;
+  --touch-power: 0%;
   --ink: #f1f0e6;
   --muted: #b3c0b8;
   position: fixed;
@@ -65,13 +66,16 @@
 .pg-touch-controls { display: none; position: absolute; right: 18px; bottom: 190px; justify-content: flex-end; align-items: flex-end; pointer-events: none; }
 .pg-touch-button { border-color: #ffffff26; border-radius: 10px; background: #ffffff08; min-width: 0; min-height: 0; user-select: none; -webkit-user-select: none; touch-action: none; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; }
 .pg-touch-button.is-pressed, .pg-touch-throw.is-pressed { background: color-mix(in srgb, var(--active-disc) 32%, #ffffff10); border-color: var(--active-disc); transform: translateY(2px); box-shadow: inset 0 3px 10px #0008; }
-.pg-touch-stack { display: flex; flex-direction: column; align-items: stretch; gap: 10px; width: min(220px, calc(100vw - 190px)); pointer-events: auto; touch-action: none; }
+.pg-touch-stack { display: flex; flex-direction: column; align-items: stretch; gap: 10px; width: min(220px, calc(100vw - 190px)); padding: 8px; pointer-events: auto; touch-action: none; }
 .pg-touch-aim-hint { padding: 8px 12px; text-align: center; color: #dbe2d8; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }
-.pg-touch-tilt { display: grid; grid-template-columns: 1fr .72fr 1fr; gap: 6px; padding: 8px; }
+.pg-touch-tilt { display: grid; grid-template-columns: 1fr .72fr 1fr; gap: 6px; }
 .pg-touch-tilt .pg-touch-button { min-height: 38px; font-size: 10px; padding: 0 5px; }
-.pg-touch-throw { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 72px; border-color: color-mix(in srgb, var(--active-disc) 65%, #ffffff22); border-radius: 18px; background: linear-gradient(135deg, color-mix(in srgb, var(--active-disc) 18%, #13241f), #13241fee); user-select: none; -webkit-user-select: none; touch-action: none; box-shadow: 0 10px 22px #0005, inset 0 1px #ffffff18; }
+.pg-touch-throw { position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 72px; border-color: color-mix(in srgb, var(--active-disc) 65%, #ffffff22); border-radius: 14px; background: linear-gradient(135deg, color-mix(in srgb, var(--active-disc) 13%, #13241f), #13241fee); user-select: none; -webkit-user-select: none; touch-action: none; box-shadow: inset 0 1px #ffffff18; }
+.pg-touch-throw::before { content: ''; position: absolute; inset: 0 auto 0 0; width: var(--touch-power); background: linear-gradient(90deg, color-mix(in srgb, var(--active-disc) 70%, #dfeecf), var(--active-disc)); opacity: .62; transition: width 60ms linear; }
+.pg-touch-throw span, .pg-touch-throw b, .pg-touch-throw em { position: relative; z-index: 1; }
 .pg-touch-throw span { font-size: 10px; color: var(--muted); letter-spacing: 0.18em; }
 .pg-touch-throw b { font-size: 17px; letter-spacing: 0.09em; color: #fff6d8; }
+.pg-touch-throw em { position: absolute; right: 10px; bottom: 8px; font-style: normal; font-size: 9px; color: #dbe2d8; opacity: .85; }
 .pg-crosshair { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; transform: translate(-50%, -50%); filter: drop-shadow(0 1px 2px #0008); }
 .pg-reticle { position: absolute; inset: 0; border: 1px solid #f5f1dd80; border-radius: 50%; }
 .pg-reticle::before, .pg-reticle::after { content: ''; position: absolute; background: #f5f1ddcc; width: 1px; height: 7px; left: calc(50% - 0.5px); }
@@ -133,18 +137,25 @@
   .pg-touch-controls { right: 12px; bottom: 188px; }
 }
 @media (max-width: 430px) and (orientation: portrait) {
-  .pg-panel { width: min(292px, calc(100vw - 24px)); padding: 12px; }
+  .pg-panel { left: 10px; right: 10px; bottom: 10px; width: auto; padding: 10px; }
+  .pg-panel-heading { margin-bottom: 7px; }
+  #pg-disc-ratings { display: none; }
+  .pg-disc-selector { gap: 6px; }
+  .pg-disc-selector button { padding: 8px 4px; font-size: 10.5px; }
+  .pg-disc-selector button kbd { min-width: 18px; height: 18px; font-size: 9px; }
+  .pg-shot-row, .pg-power, .pg-shot-footer { display: none; }
   .pg-actions { top: 96px; right: 12px; bottom: auto; padding: 4px; }
   .pg-actions button { padding: 7px 8px; font-size: 10px; }
   .pg-actions kbd { display: none; }
   .pg-actions #pg-cursor { display: none; }
-  .pg-touch-controls { bottom: 190px; }
-  .pg-touch-stack { width: min(212px, calc(100vw - 154px)); gap: 8px; }
-  .pg-touch-aim-hint { padding: 7px 10px; font-size: 9px; }
-  .pg-touch-tilt { grid-template-columns: 1fr .68fr 1fr; gap: 4px; padding: 6px; }
-  .pg-touch-tilt .pg-touch-button { min-height: 32px; padding: 0 2px; font-size: 8.5px; }
-  .pg-touch-throw { min-height: 58px; border-radius: 14px; }
+  .pg-touch-controls { left: 10px; right: 10px; bottom: 88px; justify-content: stretch; }
+  .pg-touch-stack { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 132px; grid-template-areas: 'hint hint' 'tilt throw'; gap: 7px; padding: 8px; }
+  .pg-touch-aim-hint { grid-area: hint; padding: 0; font-size: 8.5px; line-height: 1; color: var(--muted); }
+  .pg-touch-tilt { grid-area: tilt; grid-template-columns: 1fr .68fr 1fr; gap: 4px; padding: 0; }
+  .pg-touch-tilt .pg-touch-button { min-height: 52px; padding: 0 2px; font-size: 8.5px; border-radius: 9px; }
+  .pg-touch-throw { grid-area: throw; min-height: 52px; border-radius: 12px; }
   .pg-touch-throw b { font-size: 15px; }
+  .pg-touch-throw em { right: 8px; bottom: 6px; }
 }
 @media (max-height: 560px) and (pointer: coarse) {
   .pg-touch-controls { bottom: 86px; }

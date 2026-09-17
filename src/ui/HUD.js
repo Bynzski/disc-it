@@ -61,14 +61,14 @@ export class HUD {
       </nav>
 
       <section class="pg-touch-controls" aria-label="Touch controls">
-        <div class="pg-touch-stack">
-          <div class="pg-touch-aim-hint pg-glass">Drag screen to aim</div>
-          <div class="pg-touch-tilt pg-glass" aria-label="Disc tilt controls">
+        <div class="pg-touch-stack pg-glass">
+          <div class="pg-touch-aim-hint">Drag screen to aim</div>
+          <div class="pg-touch-tilt" aria-label="Disc tilt controls">
             <button type="button" class="pg-touch-button" data-touch-control="tilt-anhyzer" aria-label="Tilt anhyzer">ANHYZER</button>
             <button type="button" id="pg-touch-flat" class="pg-touch-button" aria-label="Reset disc tilt">FLAT</button>
             <button type="button" class="pg-touch-button" data-touch-control="tilt-hyzer" aria-label="Tilt hyzer">HYZER</button>
           </div>
-          <button type="button" id="pg-touch-throw" class="pg-touch-throw pg-glass" aria-label="Hold to set power, release to throw"><span>HOLD</span><b>POWER</b></button>
+          <button type="button" id="pg-touch-throw" class="pg-touch-throw" aria-label="Hold to set power, release to throw"><span>HOLD</span><b>POWER</b><em id="pg-touch-power">0%</em></button>
         </div>
       </section>
       <div class="pg-capture-hint" id="pg-capture-hint">Click course to aim</div>
@@ -99,7 +99,7 @@ export class HUD {
       'hole-number', 'hole-name', 'hole-meta', 'throws', 'distance', 'crosshair', 'cross-angle',
       'tilt-disc', 'disc-ratings', 'elevation', 'power-value', 'power-fill', 'throw-label',
       'status', 'view-toggle', 'view-label', 'restart', 'cursor', 'capture-hint',
-      'touch-throw', 'touch-flat', 'toast', 'final', 'final-eyebrow', 'final-result', 'final-score', 'final-restart', 'next', 'scorecard', 'score-total', 'final-title',
+      'touch-throw', 'touch-power', 'touch-flat', 'toast', 'final', 'final-eyebrow', 'final-result', 'final-score', 'final-restart', 'next', 'scorecard', 'score-total', 'final-title',
     ].map(id => [id, get(id)]));
     this.scoreCells = [...this.root.querySelectorAll('.pg-score-cell')];
     this.powerBar = this.root.querySelector('.pg-power');
@@ -180,9 +180,11 @@ export class HUD {
     this.el['tilt-disc'].style.transform = `translate(-50%, -50%) rotate(${-data.releaseDeg || 0}deg)`;
     this.el.crosshair.hidden = data.mode !== 'aiming' || data.finished;
     const power = Math.round(data.power * 100);
+    this.root.style.setProperty('--touch-power', `${power}%`);
     this.el['power-fill'].style.width = `${power}%`;
     this.powerBar.setAttribute('aria-valuenow', power);
     this.el['power-value'].textContent = `POWER ${power}%`;
+    this.el['touch-power'].textContent = `${power}%`;
     this.el['throw-label'].textContent = data.charging ? 'Release to throw' : 'Hold / release';
     this.el.status.textContent = data.finished ? 'COMPLETE' : data.mode === 'flying' ? 'IN FLIGHT' : data.charging ? (data.powerRising ? '↑ RISING' : '↓ FALLING') : 'READY';
     this.el['view-label'].textContent = data.cameraView === 'first' ? 'Elevated' : 'First person';
