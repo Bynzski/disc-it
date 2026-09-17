@@ -84,6 +84,8 @@ const state = {
   finished: false,
 };
 
+const touchControls = new Set();
+
 const hud = new HUD({
   holes,
   onRestart: restartHole,
@@ -91,6 +93,11 @@ const hud = new HUD({
   onToggleView: toggleCameraView,
   onSelectDisc: selectDisc,
   onReleaseMouse: () => { if (isMouseCaptured()) document.exitPointerLock(); },
+  onTouchControl: setTouchControl,
+  onTouchThrowStart: startTouchThrow,
+  onTouchThrowEnd: endTouchThrow,
+  onTouchThrowCancel: cancelTouchThrow,
+  onTouchFlat: resetTouchTilt,
 });
 
 const preview = new HolePreviewController({
@@ -158,6 +165,50 @@ function requestMouseCapture() {
   renderer.domElement.requestPointerLock?.();
 }
 
+function setTouchControl(control, active) {
+  if (!control) return;
+  if (active) touchControls.add(control);
+  else touchControls.delete(control);
+}
+
+function resetTouchTilt() {
+  if (state.mode !== 'aiming' || state.finished) return;
+  state.releaseAngle = 0;
+}
+
+function startTouchThrow() {
+  if (state.mode !== 'aiming' || state.finished || state.charging) return;
+  state.charging = true;
+  state.chargeStart = performance.now();
+  state.power = 0;
+}
+
+function endTouchThrow() {
+  if (!state.charging) return;
+  state.charging = false;
+  if (state.mode === 'aiming' && !state.finished) state.power = chargePower(performance.now());
+  throwDisc();
+}
+
+function cancelTouchThrow() {
+  if (!state.charging || state.mode !== 'aiming') return;
+  state.charging = false;
+  state.power = 0;
+}
+
+function updateTouchAiming(dt) {
+  if (state.mode !== 'aiming' || state.finished) {
+    touchControls.clear();
+    return;
+  }
+  const yawAxis = (touchControls.has('aim-left') ? 1 : 0) - (touchControls.has('aim-right') ? 1 : 0);
+  const elevationAxis = (touchControls.has('aim-up') ? 1 : 0) - (touchControls.has('aim-down') ? 1 : 0);
+  const tiltAxis = (touchControls.has('tilt-hyzer') ? 1 : 0) - (touchControls.has('tilt-anhyzer') ? 1 : 0);
+  if (yawAxis) state.aimYaw += yawAxis * 1.45 * dt;
+  if (elevationAxis) state.elevation = clamp(state.elevation + elevationAxis * 0.62 * dt, MIN_ELEVATION, MAX_ELEVATION);
+  if (tiltAxis) state.releaseAngle = clamp(state.releaseAngle + tiltAxis * 0.72 * dt, -0.38, 0.38);
+}
+
 function chargePower(now) {
   const phase = ((now - state.chargeStart) % POWER_CYCLE_MS) / POWER_CYCLE_MS;
   const rising = phase <= 0.5;
@@ -184,6 +235,7 @@ function throwDisc() {
   // A raised putting release makes gentle, level putts reach the chains.
   state.position.y = state.discType === 'putter' ? state.lie.y + 1.2 : REST_HEIGHT + 0.08;
   state.mode = 'flying';
+  touchControls.clear();
   state.throws += 1;
   state.spin = 0;
   state.spinRate = 26;
@@ -216,6 +268,7 @@ function startHole(index) {
   state.cameraSnap = true;
   state.pointerX = innerWidth / 2;
   state.pointerY = innerHeight * 0.46;
+  touchControls.clear();
   pointAimAtBasket();
   // Face the first playable lane, not the pin behind a dogleg's trees.
   const opening = hole().aimPoint || hole().basket;
@@ -505,6 +558,7 @@ function animate(now) {
   if (state.charging && state.mode === 'aiming') {
     state.power = chargePower(now);
   }
+  updateTouchAiming(dt);
   updatePhysics(dt);
   if (preview.active) preview.update(dt);
   else updateCamera(dt);

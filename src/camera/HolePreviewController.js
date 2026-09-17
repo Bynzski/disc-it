@@ -25,12 +25,14 @@ export class HolePreviewController {
       e.preventDefault(); e.stopImmediatePropagation();
       if (!e.repeat && ['Space', 'Enter', 'Escape'].includes(e.code)) this.skip();
     }, true);
-    window.addEventListener('mousedown', e => {
+    const skipPointer = e => {
       if (!this.active) return;
       e.preventDefault(); e.stopImmediatePropagation();
       this.swallowClick = true;
       this.skip();
-    }, true);
+    };
+    window.addEventListener('pointerdown', skipPointer, true);
+    window.addEventListener('mousedown', skipPointer, true);
     window.addEventListener('click', e => {
       if (!this.active && !this.swallowClick) return;
       e.preventDefault(); e.stopImmediatePropagation();

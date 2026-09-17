@@ -3,7 +3,8 @@
 .pg-root.is-preview .pg-crosshair,
 .pg-root.is-preview .pg-stats,
 .pg-root.is-preview .pg-toast,
-.pg-root.is-preview .pg-capture-hint { visibility: hidden; }
+.pg-root.is-preview .pg-capture-hint,
+.pg-root.is-preview .pg-touch-controls { visibility: hidden; }
 .pg-preview { position: fixed; inset: 0; z-index: 50; pointer-events: none; }
 .pg-preview[hidden] { display: none; }
 .pg-preview-fade { position: absolute; inset: 0; background: #101c1a; opacity: 0; }

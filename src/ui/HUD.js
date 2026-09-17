@@ -13,7 +13,7 @@ const resultLabel = (throws, par) => {
 };
 
 export class HUD {
-  constructor({ holes, onRestart, onToggleView, onSelectDisc, onReleaseMouse, onNextHole }) {
+  constructor({ holes, onRestart, onToggleView, onSelectDisc, onReleaseMouse, onNextHole, onTouchControl, onTouchThrowStart, onTouchThrowEnd, onTouchThrowCancel, onTouchFlat }) {
     this.holes = holes;
     this.root = document.createElement('div');
     this.root.className = 'pg-root';
@@ -59,6 +59,24 @@ export class HUD {
         <button type="button" id="pg-restart" aria-keyshortcuts="r" title="Restart this hole"><kbd>R</kbd> Restart</button>
         <button type="button" id="pg-cursor" aria-keyshortcuts="Escape" title="Release mouse capture"><kbd>Esc</kbd> Cursor</button>
       </nav>
+
+      <section class="pg-touch-controls" aria-label="Touch controls">
+        <div class="pg-touch-pad pg-glass" aria-label="Aim controls">
+          <button type="button" class="pg-touch-button pg-touch-up" data-touch-control="aim-up" aria-label="Aim higher">▲</button>
+          <button type="button" class="pg-touch-button pg-touch-left" data-touch-control="aim-left" aria-label="Aim left">◀</button>
+          <div class="pg-touch-center"><span>AIM</span></div>
+          <button type="button" class="pg-touch-button pg-touch-right" data-touch-control="aim-right" aria-label="Aim right">▶</button>
+          <button type="button" class="pg-touch-button pg-touch-down" data-touch-control="aim-down" aria-label="Aim lower">▼</button>
+        </div>
+        <div class="pg-touch-stack">
+          <div class="pg-touch-tilt pg-glass" aria-label="Disc tilt controls">
+            <button type="button" class="pg-touch-button" data-touch-control="tilt-anhyzer" aria-label="Tilt anhyzer">ANHYZER</button>
+            <button type="button" id="pg-touch-flat" class="pg-touch-button" aria-label="Reset disc tilt">FLAT</button>
+            <button type="button" class="pg-touch-button" data-touch-control="tilt-hyzer" aria-label="Tilt hyzer">HYZER</button>
+          </div>
+          <button type="button" id="pg-touch-throw" class="pg-touch-throw pg-glass" aria-label="Hold to set power, release to throw"><span>HOLD</span><b>POWER</b></button>
+        </div>
+      </section>
       <div class="pg-capture-hint" id="pg-capture-hint">Click course to aim</div>
       <div class="pg-toast" id="pg-toast" role="status"></div>
 
@@ -87,11 +105,12 @@ export class HUD {
       'hole-number', 'hole-name', 'hole-meta', 'throws', 'distance', 'crosshair', 'cross-angle',
       'tilt-disc', 'disc-ratings', 'elevation', 'power-value', 'power-fill', 'throw-label',
       'status', 'view-toggle', 'view-label', 'restart', 'cursor', 'capture-hint',
-      'toast', 'final', 'final-eyebrow', 'final-result', 'final-score', 'final-restart', 'next', 'scorecard', 'score-total', 'final-title',
+      'touch-throw', 'touch-flat', 'toast', 'final', 'final-eyebrow', 'final-result', 'final-score', 'final-restart', 'next', 'scorecard', 'score-total', 'final-title',
     ].map(id => [id, get(id)]));
     this.scoreCells = [...this.root.querySelectorAll('.pg-score-cell')];
     this.powerBar = this.root.querySelector('.pg-power');
     this.discButtons = [...this.root.querySelectorAll('[data-disc]')];
+    this.touchButtons = [...this.root.querySelectorAll('[data-touch-control]')];
     for (const button of this.discButtons) {
       button.addEventListener('click', () => onSelectDisc?.(button.dataset.disc));
     }
@@ -100,6 +119,51 @@ export class HUD {
     this.el.cursor.addEventListener('click', () => onReleaseMouse?.());
     this.el['final-restart'].addEventListener('click', () => onRestart?.());
     this.el.next.addEventListener('click', () => onNextHole?.());
+
+    const setTouchPressed = (button, pressed, event) => {
+      event?.preventDefault();
+      event?.stopPropagation();
+      button.classList.toggle('is-pressed', pressed);
+      onTouchControl?.(button.dataset.touchControl, pressed);
+    };
+    for (const button of this.touchButtons) {
+      button.addEventListener('pointerdown', event => {
+        if (button.disabled) return;
+        button.setPointerCapture?.(event.pointerId);
+        setTouchPressed(button, true, event);
+      });
+      button.addEventListener('pointerup', event => setTouchPressed(button, false, event));
+      button.addEventListener('pointercancel', event => setTouchPressed(button, false, event));
+      button.addEventListener('lostpointercapture', event => setTouchPressed(button, false, event));
+    }
+    this.el['touch-flat'].addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      onTouchFlat?.();
+    });
+    this.el['touch-throw'].addEventListener('pointerdown', event => {
+      if (this.el['touch-throw'].disabled) return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.el['touch-throw'].setPointerCapture?.(event.pointerId);
+      this.el['touch-throw'].classList.add('is-pressed');
+      onTouchThrowStart?.();
+    });
+    this.el['touch-throw'].addEventListener('pointerup', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!this.el['touch-throw'].classList.contains('is-pressed')) return;
+      this.el['touch-throw'].classList.remove('is-pressed');
+      onTouchThrowEnd?.();
+    });
+    const cancelTouchThrow = event => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.el['touch-throw'].classList.remove('is-pressed');
+      onTouchThrowCancel?.();
+    };
+    this.el['touch-throw'].addEventListener('pointercancel', cancelTouchThrow);
+    this.el['touch-throw'].addEventListener('lostpointercapture', cancelTouchThrow);
   }
 
   update(data) {
@@ -129,8 +193,12 @@ export class HUD {
     this.el.status.textContent = data.finished ? 'COMPLETE' : data.mode === 'flying' ? 'IN FLIGHT' : data.charging ? (data.powerRising ? '↑ RISING' : '↓ FALLING') : 'READY';
     this.el['view-label'].textContent = data.cameraView === 'first' ? 'Elevated' : 'First person';
     this.el['view-toggle'].setAttribute('aria-pressed', String(data.cameraView === 'third'));
-    this.el['view-toggle'].disabled = data.mode !== 'aiming' || data.finished;
+    const canAim = data.mode === 'aiming' && !data.finished;
+    this.el['view-toggle'].disabled = !canAim;
     this.el.cursor.disabled = !data.mouseCaptured;
+    for (const button of this.touchButtons) button.disabled = !canAim;
+    this.el['touch-flat'].disabled = !canAim;
+    this.el['touch-throw'].disabled = !canAim;
     this.el['capture-hint'].hidden = data.mouseCaptured || data.mode !== 'aiming' || data.finished;
     this.el.final.hidden = !data.finished;
     this.el['final-eyebrow'].textContent = `TOCOBAGA · HOLE ${String(hole.id).padStart(2, '0')}`;
