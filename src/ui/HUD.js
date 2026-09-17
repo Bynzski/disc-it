@@ -84,7 +84,12 @@ export class HUD {
             <div class="pg-title-course">
               <span class="pg-title-selected"><i aria-hidden="true"></i> SELECTED COURSE</span>
               <h3>Tocobaga Park</h3>
-              <p>${holes.length} Holes <span>•</span> Par ${holes.reduce((sum, h) => sum + h.par, 0)} <span>•</span> ${holes.reduce((sum, h) => sum + h.lengthFeet, 0)} ft</p>
+              <p id="pg-round-summary">${holes.length} Holes <span>•</span> Par ${holes.reduce((sum, h) => sum + h.par, 0)} <span>•</span> ${holes.reduce((sum, h) => sum + h.lengthFeet, 0)} ft</p>
+              <div class="pg-round-options" role="radiogroup" aria-label="Round format">
+                <button type="button" data-round-format="front" role="radio" aria-checked="false">Front 9</button>
+                <button type="button" data-round-format="back" role="radio" aria-checked="false">Back 9</button>
+                <button type="button" data-round-format="all" role="radio" aria-checked="true" class="is-selected">All 18</button>
+              </div>
             </div>
             <button type="button" id="pg-start-round" class="pg-title-play" aria-keyshortcuts="Enter Space" aria-label="Play course: Tocobaga Park">Play Course <span aria-hidden="true">→</span></button>
           </div>
@@ -121,7 +126,7 @@ export class HUD {
       'hole-number', 'hole-name', 'hole-meta', 'throws', 'distance', 'crosshair', 'cross-angle',
       'tilt-disc', 'disc-ratings', 'elevation', 'power-value', 'power-fill', 'throw-label',
       'status', 'view-toggle', 'view-label', 'restart', 'cursor', 'capture-hint',
-      'touch-throw', 'touch-power', 'touch-flat', 'toast', 'landing', 'start-round', 'final', 'final-eyebrow', 'final-result', 'final-score', 'final-restart', 'next', 'scorecard', 'score-total', 'final-title',
+      'touch-throw', 'touch-power', 'touch-flat', 'toast', 'landing', 'start-round', 'round-summary', 'final', 'final-eyebrow', 'final-result', 'final-score', 'final-restart', 'next', 'scorecard', 'score-total', 'final-title',
     ].map(id => [id, get(id)]));
     this.scoreCells = [...this.root.querySelectorAll('.pg-score-cell')];
     this.powerBar = this.root.querySelector('.pg-power');
@@ -135,7 +140,20 @@ export class HUD {
     this.el.cursor.addEventListener('click', () => onReleaseMouse?.());
     this.el['final-restart'].addEventListener('click', () => onRestart?.());
     this.el.next.addEventListener('click', () => onNextHole?.());
-    this.el['start-round'].addEventListener('click', () => onStartRound?.());
+    this.roundFormat = 'all';
+    this.roundButtons = [...this.root.querySelectorAll('[data-round-format]')];
+    const selectRound = format => {
+      this.roundFormat = format;
+      const selected = format === 'front' ? holes.slice(0, 9) : format === 'back' ? holes.slice(9) : holes;
+      for (const button of this.roundButtons) {
+        const active = button.dataset.roundFormat === format;
+        button.classList.toggle('is-selected', active);
+        button.setAttribute('aria-checked', String(active));
+      }
+      this.el['round-summary'].innerHTML = `${selected.length} Holes <span>•</span> Par ${selected.reduce((sum, h) => sum + h.par, 0)} <span>•</span> ${selected.reduce((sum, h) => sum + h.lengthFeet, 0)} ft`;
+    };
+    for (const button of this.roundButtons) button.addEventListener('click', () => selectRound(button.dataset.roundFormat));
+    this.el['start-round'].addEventListener('click', () => onStartRound?.(this.roundFormat));
 
     const setTouchPressed = (button, pressed, event) => {
       event?.preventDefault();
@@ -185,6 +203,13 @@ export class HUD {
 
   update(data) {
     if (!data) return;
+    if (this.scoreCells.length !== data.holes.length) {
+      this.el.scorecard.innerHTML = `<thead><tr><th></th>${data.holes.map((h) => `<th>${h.id}</th>`).join('')}<th>TOT</th></tr></thead><tbody>
+        <tr><th scope="row">Par</th>${data.holes.map(h => `<td>${h.par}</td>`).join('')}<td>${data.holes.reduce((sum, h) => sum + h.par, 0)}</td></tr>
+        <tr><th>Score</th>${data.holes.map(() => '<td class="pg-score-cell">–</td>').join('')}<td class="pg-total" id="pg-score-total">–</td></tr></tbody>`;
+      this.scoreCells = [...this.el.scorecard.querySelectorAll('.pg-score-cell')];
+      this.el['score-total'] = this.el.scorecard.querySelector('#pg-score-total');
+    }
     const profile = DISCS[data.discType];
     const hole = data.hole;
     const isLanding = data.showLanding;

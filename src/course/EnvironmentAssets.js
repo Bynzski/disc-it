@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { distanceToSegment, COURSE_BOUNDS, WATER } from './Layout.js';
+import { createBin } from './ParkAssets.js';
+import { PREVIEW_PATHS } from '../camera/PreviewPaths.js';
 
 // Decorative prefabs. One shared geometry/material per primitive; baked into
 // spatially grouped instances below, rather than a draw call for each slat.
@@ -110,6 +112,28 @@ export function environmentClearance(x, z, radius, holes, colliders) {
   });
 }
 
+function bakeAssets(scene, assets, name) {
+  const parts = new Map();
+  for (const asset of assets) {
+    asset.updateMatrixWorld(true);
+    asset.traverse(mesh => {
+      if (!mesh.isMesh) return;
+      const key = `${mesh.geometry.uuid}/${mesh.material.uuid}`;
+      if (!parts.has(key)) parts.set(key, { geometry: mesh.geometry, material: mesh.material, matrices: [] });
+      parts.get(key).matrices.push(mesh.matrixWorld.clone());
+    });
+  }
+  return [...parts.values()].map(({ geometry, material, matrices }) => {
+    const batch = new THREE.InstancedMesh(geometry, material, matrices.length);
+    batch.name = name;
+    matrices.forEach((matrix, i) => batch.setMatrixAt(i, matrix));
+    batch.instanceMatrix.needsUpdate = true;
+    batch.castShadow = true; batch.receiveShadow = true;
+    batch.computeBoundingSphere(); scene.add(batch);
+    return batch;
+  });
+}
+
 export function addEnvironmentDetails(scene, holes, colliders) {
   const placements = [], batches = [];
   const zones = [
@@ -160,4 +184,52 @@ export function addEnvironmentDetails(scene, holes, colliders) {
     }
   }
   return { placements, batches };
+}
+
+// A restrained layer of course furniture. Candidate locations are derived from
+// tees and walking links, then rejected if they crowd any playable corridor,
+// green, obstacle, water edge, existing park zone, or preview camera path.
+export function addCourseDressing(scene, holes, colliders, established = []) {
+  const placements = [], assets = [];
+  const occupied = [...established];
+  const candidates = [];
+  const teeFurniture = [2, 5, 8, 11, 14, 17];
+  for (const id of teeFurniture) {
+    const h = holes[id - 1], a = h.route[0], b = h.route[1];
+    const dx = b[0] - a[0], dz = b[1] - a[1], length = Math.hypot(dx, dz);
+    const fx = dx / length, fz = dz / length, lx = -fz, lz = fx;
+    candidates.push({ type: 'bench', context: `Hole ${id} tee`, x: a[0] - fx * 2 + lx * 7, z: a[1] - fz * 2 + lz * 7,
+      rotation: Math.atan2(dx, dz), radius: 1.6 });
+    if ([5, 11, 17].includes(id)) candidates.push({ type: 'bin', context: `Hole ${id} tee`,
+      x: a[0] - fx * 3 - lx * 6, z: a[1] - fz * 3 - lz * 6, radius: .7 });
+  }
+  for (const id of [3, 6, 12, 15]) {
+    const h = holes[id - 1], next = holes[id];
+    const x = (h.basket.x + next.tee.x) / 2, z = (h.basket.z + next.tee.z) / 2;
+    const dx = next.tee.x - h.basket.x, dz = next.tee.z - h.basket.z, length = Math.hypot(dx, dz);
+    candidates.push({ type: 'shrub', context: `Walk ${id}–${id + 1}`, x: x - dz / length * 4.5, z: z + dx / length * 4.5,
+      rotation: id, radius: 1.7, variant: id % 2 });
+  }
+  const clear = candidate => {
+    const { x, z, radius } = candidate;
+    if (WATER.some(p => Math.hypot(x-p.x, z-p.z) < p.radius+radius+3)) return false;
+    if (colliders.some(c => Math.hypot(x-(c.x ?? c.center.x), z-(c.z ?? c.center.z)) < radius+(c.canopyRadius ?? 3)+.8)) return false;
+    if (occupied.some(p => Math.hypot(x-p.x, z-p.z) < radius+p.radius+1)) return false;
+    return holes.every(h => {
+      if (Math.hypot(x-h.tee.x, z-h.tee.z) < radius+4.5 || Math.hypot(x-h.basket.x, z-h.basket.z) < radius+7) return false;
+      const routes = [h.route, h.alternate].filter(Boolean);
+      if (routes.some(path => path.slice(1).some((b, i) => distanceToSegment(x, z, path[i], b) < radius+3))) return false;
+      const preview = h.previewPath || PREVIEW_PATHS[h.id];
+      return !preview || !preview.slice(1).some((b, i) => distanceToSegment(x, z, [preview[i][0], preview[i][2]], [b[0], b[2]]) < radius+2);
+    });
+  };
+  for (const candidate of candidates) {
+    if (!clear(candidate)) continue;
+    const asset = candidate.type === 'bench' ? createBench() : candidate.type === 'bin' ? createBin() : createShrub(candidate.variant);
+    asset.position.set(candidate.x, 0, candidate.z); asset.rotation.y = candidate.rotation || 0;
+    assets.push(asset);
+    const placement = { name: asset.name, context: candidate.context, x: candidate.x, z: candidate.z, radius: candidate.radius };
+    placements.push(placement); occupied.push(placement);
+  }
+  return { placements, batches: bakeAssets(scene, assets, 'Course dressing') };
 }

@@ -42,6 +42,7 @@ scene.add(sun);
 
 const course = buildCourse(scene);
 const { holes, colliders } = course;
+let roundHoles = holes;
 const disc = new Disc(scene);
 
 const aimLine = new THREE.Line(
@@ -141,7 +142,7 @@ const preview = new HolePreviewController({
   },
 });
 
-const hole = () => holes[state.holeIndex];
+const hole = () => roundHoles[state.holeIndex];
 
 function selectDisc(type) {
   if (!Object.hasOwn(DISCS, type) || state.showLanding || state.mode !== 'aiming' || state.finished || state.charging) return;
@@ -300,9 +301,11 @@ function throwDisc() {
   hud.toast(`Throw ${state.throws} · ${profile.name} · ${Math.round(power * 100)}% power`);
 }
 
-function startRound() {
+function startRound(format = 'all') {
   if (!state.showLanding) return;
-  state.scores = holes.map(() => null);
+  roundHoles = format === 'front' ? holes.slice(0, 9) : format === 'back' ? holes.slice(9) : holes;
+  state.roundFormat = format;
+  state.scores = roundHoles.map(() => null);
   startHole(0);
 }
 
@@ -352,10 +355,10 @@ function restartHole() {
 function nextHole() {
   // Advance only after a scored finish; N must not skip unplayed holes.
   if (!state.finished) return;
-  if (state.holeIndex + 1 < holes.length) {
+  if (state.holeIndex + 1 < roundHoles.length) {
     startHole(state.holeIndex + 1);
   } else {
-    state.scores = holes.map(() => null);
+    state.scores = roundHoles.map(() => null);
     startHole(0);
   }
 }
@@ -374,7 +377,7 @@ function finishHole() {
   state.spinRate = 0;
   state.bank = 0;
   state.scores[state.holeIndex] = state.throws;
-  const last = state.holeIndex + 1 >= holes.length;
+  const last = state.holeIndex + 1 >= roundHoles.length;
   hud.toast(last ? 'Round complete!' : 'Chains! Hole complete.');
 }
 
@@ -597,12 +600,12 @@ function updateHUD() {
 
   hud.update({
     hole: hole(),
-    holes,
+    holes: roundHoles,
     scores: state.scores,
     roundOver: state.scores.every(s => s !== null),
     holeIndex: state.holeIndex,
-    holeCount: holes.length,
-    courseTotal: holes.reduce((sum, h) => sum + h.lengthFeet, 0),
+    holeCount: roundHoles.length,
+    courseTotal: roundHoles.reduce((sum, h) => sum + h.lengthFeet, 0),
     throws: state.throws,
     discType: state.discType,
     showLanding: state.showLanding,
@@ -705,7 +708,7 @@ window.addEventListener('keydown', (e) => {
   if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
   if (state.showLanding && (e.code === 'Enter' || e.code === 'Space')) {
     e.preventDefault();
-    startRound();
+    startRound(hud.roundFormat);
   }
   if (e.key === 'r' || e.key === 'R') restartHole();
   if (e.key === 'v' || e.key === 'V') toggleCameraView();

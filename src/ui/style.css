@@ -114,6 +114,10 @@
 .pg-title-course h3 { margin: 7px 0; color: #fff6df; font-size: 23px; font-weight: 550; letter-spacing: -.025em; }
 .pg-title-course p { margin: 0; color: #d0dbd0; font-size: 12px; }
 .pg-title-course p span { padding: 0 5px; color: #9eaea4; }
+.pg-round-options { display: flex; gap: 6px; margin-top: 13px; }
+.pg-root .pg-round-options button { min-height: 34px; padding: 0 12px; border: 1px solid #ffffff24; border-radius: 7px; color: #cbd7ce; font-size: 11px; background: #071d1838; }
+.pg-root .pg-round-options button:hover { border-color: #e8d4a570; color: #fff6df; }
+.pg-root .pg-round-options button.is-selected { border-color: #e8d4a5; color: #19352c; background: #e8d4a5; font-weight: 650; }
 .pg-root .pg-title-play { flex-shrink: 0; display: flex; justify-content: center; align-items: center; gap: 26px; min-height: 48px; padding: 0 22px; border-radius: 9px; background: #e8d4a5; color: #19352c; font-size: 13px; font-weight: 650; box-shadow: inset 0 1px #fff7dc70; transition: background 150ms, transform 150ms; }
 .pg-root .pg-title-play:hover:not(:disabled) { background: #f5e3bb; transform: translateY(-1px); }
 .pg-root .pg-title-play:active { transform: translateY(1px); }
@@ -128,6 +132,8 @@
   .pg-title-subtitle { font-size: 8px; margin-top: 10px; }
   .pg-title-dock { flex-direction: column; align-items: stretch; gap: 16px; padding: 18px; }
   .pg-title-course h3 { font-size: 22px; }
+  .pg-round-options { margin-top: 11px; }
+  .pg-root .pg-round-options button { flex: 1; min-height: 38px; padding: 0 5px; }
   .pg-root .pg-title-play { justify-content: space-between; }
 }
 @media (max-height: 500px) {

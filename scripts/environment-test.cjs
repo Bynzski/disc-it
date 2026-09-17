@@ -16,7 +16,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/home/jay/.npm/_npx
       const { environmentClearance } = await import('/src/course/EnvironmentAssets.js');
       const { course, colliders, renderer, scene, camera } = envTest;
       renderer.setAnimationLoop(null);
-      const { placements, batches } = course.environment;
+      const { placements, batches, dressing } = course.environment;
+      if (dressing.placements.length !== 12) throw Error(`Expected 12 restrained dressing props, got ${dressing.placements.length}`);
+      if (new Set(dressing.placements.map(p => p.context)).size < 9) throw Error('Dressing lacks location variety');
       for (const p of placements) {
         if (!environmentClearance(p.x, p.z, p.radius, course.holes.slice(0, 9), colliders.filter(c => !c.holeId || c.holeId <= 9))) throw Error('Unsafe placement: ' + p.name);
       }
@@ -29,6 +31,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/home/jay/.npm/_npx
       }
       const baseline = measure(false), detailed = measure(true);
       return { baseline, detailed, placements: placements.length, batches: batches.length,
+        dressing: { placements: dressing.placements.length, batches: dressing.batches.length,
+          types: [...new Set(dressing.placements.map(p => p.name))], contexts: dressing.placements.map(p => p.context) },
         names: [...new Set(placements.map(p => p.name))], zones: [...new Set(placements.map(p => p.zone))] };
     });
     assert.equal(report.names.length, 9, 'all nine prefab types placed');
