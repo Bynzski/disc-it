@@ -61,14 +61,8 @@ export class HUD {
       </nav>
 
       <section class="pg-touch-controls" aria-label="Touch controls">
-        <div class="pg-touch-pad pg-glass" aria-label="Aim controls">
-          <button type="button" class="pg-touch-button pg-touch-up" data-touch-control="aim-up" aria-label="Aim higher">▲</button>
-          <button type="button" class="pg-touch-button pg-touch-left" data-touch-control="aim-left" aria-label="Aim left">◀</button>
-          <div class="pg-touch-center"><span>AIM</span></div>
-          <button type="button" class="pg-touch-button pg-touch-right" data-touch-control="aim-right" aria-label="Aim right">▶</button>
-          <button type="button" class="pg-touch-button pg-touch-down" data-touch-control="aim-down" aria-label="Aim lower">▼</button>
-        </div>
         <div class="pg-touch-stack">
+          <div class="pg-touch-aim-hint pg-glass">Drag screen to aim</div>
           <div class="pg-touch-tilt pg-glass" aria-label="Disc tilt controls">
             <button type="button" class="pg-touch-button" data-touch-control="tilt-anhyzer" aria-label="Tilt anhyzer">ANHYZER</button>
             <button type="button" id="pg-touch-flat" class="pg-touch-button" aria-label="Reset disc tilt">FLAT</button>

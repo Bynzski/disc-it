@@ -23,6 +23,7 @@ const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 70
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.domElement.style.touchAction = 'none';
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 app.appendChild(renderer.domElement);
@@ -85,6 +86,13 @@ const state = {
 };
 
 const touchControls = new Set();
+const touchAim = {
+  active: false,
+  pointerId: null,
+  lastX: 0,
+  lastY: 0,
+  suppressMouseUntil: 0,
+};
 
 const hud = new HUD({
   holes,
@@ -199,14 +207,46 @@ function cancelTouchThrow() {
 function updateTouchAiming(dt) {
   if (state.mode !== 'aiming' || state.finished) {
     touchControls.clear();
+    touchAim.active = false;
     return;
   }
-  const yawAxis = (touchControls.has('aim-left') ? 1 : 0) - (touchControls.has('aim-right') ? 1 : 0);
-  const elevationAxis = (touchControls.has('aim-up') ? 1 : 0) - (touchControls.has('aim-down') ? 1 : 0);
   const tiltAxis = (touchControls.has('tilt-hyzer') ? 1 : 0) - (touchControls.has('tilt-anhyzer') ? 1 : 0);
-  if (yawAxis) state.aimYaw += yawAxis * 1.45 * dt;
-  if (elevationAxis) state.elevation = clamp(state.elevation + elevationAxis * 0.62 * dt, MIN_ELEVATION, MAX_ELEVATION);
   if (tiltAxis) state.releaseAngle = clamp(state.releaseAngle + tiltAxis * 0.72 * dt, -0.38, 0.38);
+}
+
+function canDragAim() {
+  return state.mode === 'aiming' && !state.finished && !state.charging;
+}
+
+function startDragAim(e) {
+  if (!canDragAim() || (e.pointerType !== 'touch' && e.pointerType !== 'pen')) return;
+  e.preventDefault();
+  touchAim.active = true;
+  touchAim.pointerId = e.pointerId;
+  touchAim.lastX = e.clientX;
+  touchAim.lastY = e.clientY;
+  touchAim.suppressMouseUntil = performance.now() + 650;
+  renderer.domElement.setPointerCapture?.(e.pointerId);
+}
+
+function moveDragAim(e) {
+  if (!touchAim.active || e.pointerId !== touchAim.pointerId) return;
+  e.preventDefault();
+  const dx = e.clientX - touchAim.lastX;
+  const dy = e.clientY - touchAim.lastY;
+  touchAim.lastX = e.clientX;
+  touchAim.lastY = e.clientY;
+  if (!canDragAim()) return;
+  state.aimYaw -= dx * 0.0042;
+  state.elevation = clamp(state.elevation - dy * 0.0034, MIN_ELEVATION, MAX_ELEVATION);
+}
+
+function endDragAim(e) {
+  if (!touchAim.active || e.pointerId !== touchAim.pointerId) return;
+  e.preventDefault();
+  touchAim.active = false;
+  touchAim.pointerId = null;
+  touchAim.suppressMouseUntil = performance.now() + 650;
 }
 
 function chargePower(now) {
@@ -572,6 +612,11 @@ function animate(now) {
   renderer.render(scene, camera);
 }
 
+renderer.domElement.addEventListener('pointerdown', startDragAim, { passive: false });
+renderer.domElement.addEventListener('pointermove', moveDragAim, { passive: false });
+renderer.domElement.addEventListener('pointerup', endDragAim, { passive: false });
+renderer.domElement.addEventListener('pointercancel', endDragAim, { passive: false });
+
 window.addEventListener('mousemove', (e) => {
   if (state.mode === 'aiming' && !state.finished && state.mouseCaptured) {
     state.aimYaw -= e.movementX * 0.0024;
@@ -582,6 +627,7 @@ window.addEventListener('mousemove', (e) => {
 });
 
 window.addEventListener('mousedown', (e) => {
+  if (performance.now() < touchAim.suppressMouseUntil) return;
   if (e.button !== 0 || state.mode !== 'aiming' || state.finished) return;
   if (e.target.closest?.('button')) return;
   if (!state.mouseCaptured) {
