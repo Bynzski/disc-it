@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { buildCourse, COURSE_BOUNDS } from './course/Course.js';
+import { buildCourse } from './course/Course.js';
+import { buildThunderbirdCourse } from './course/ThunderbirdCourse.js';
 import { collideBoulder } from './course/Boulder.js';
 import { Disc, DISCS } from './entities/Disc.js';
 import { HUD } from './ui/HUD.js';
@@ -40,8 +41,12 @@ sun.shadow.camera.top = 90;
 sun.shadow.camera.bottom = -90;
 scene.add(sun);
 
-const course = buildCourse(scene);
-const { holes, colliders } = course;
+const tocobagaRoot = new THREE.Group(), thunderbirdRoot = new THREE.Group();
+scene.add(tocobagaRoot, thunderbirdRoot);
+const courses = { tocobaga: buildCourse(tocobagaRoot), thunderbird: buildThunderbirdCourse(thunderbirdRoot) };
+thunderbirdRoot.visible = false;
+let course = courses.tocobaga;
+let holes = course.holes, colliders = course.colliders;
 let roundHoles = holes;
 const disc = new Disc(scene);
 
@@ -111,6 +116,7 @@ const touchAim = {
 const hud = new HUD({
   holes,
   onStartRound: startRound,
+  onSelectCourse: selectCourse,
   onRestart: restartHole,
   onNextHole: nextHole,
   onToggleView: toggleCameraView,
@@ -289,7 +295,7 @@ function throwDisc() {
   state.velocity.addScaledVector(right, -state.releaseAngle * 3.2);
   state.position.copy(state.lie);
   // A raised putting release makes gentle, level putts reach the chains.
-  state.position.y = state.discType === 'putter' ? state.lie.y + 1.2 : REST_HEIGHT + 0.08;
+  state.position.y = state.discType === 'putter' ? state.lie.y + 1.2 : state.lie.y + 0.08;
   state.mode = 'flying';
   touchControls.clear();
   state.throws += 1;
@@ -299,6 +305,15 @@ function throwDisc() {
   state.bank = state.releaseAngle;
   disc.resetTrail();
   hud.toast(`Throw ${state.throws} · ${profile.name} · ${Math.round(power * 100)}% power`);
+}
+
+function selectCourse(id) {
+  if (!courses[id] || !state.showLanding) return;
+  course = courses[id]; holes = course.holes; colliders = course.colliders; roundHoles = holes;
+  tocobagaRoot.visible = id === 'tocobaga'; thunderbirdRoot.visible = id === 'thunderbird';
+  scene.background.setHex(course.palette.sky); scene.fog.color.setHex(course.palette.fog);
+  state.lie.copy(holes[0].tee); state.position.copy(holes[0].tee); pointAimAtBasket();
+  return holes;
 }
 
 function startRound(format = 'all') {
@@ -368,7 +383,7 @@ function finishHole() {
   state.finished = true;
   state.mode = 'holed';
   state.velocity.set(0, 0, 0);
-  state.position.set(hole().basket.x, 1.15, hole().basket.z);
+  state.position.set(hole().basket.x, hole().basket.y + 1.15, hole().basket.z);
   state.charging = false;
   state.power = 0;
   // Free the cursor so dialogs (Next hole / Restart) are clickable.
@@ -383,7 +398,7 @@ function finishHole() {
 
 function updateSunTarget() {
   const current = hole();
-  sun.target.position.set(current.basket.x, 0, current.basket.z);
+  sun.target.position.copy(current.basket);
   sun.target.updateMatrixWorld();
 }
 
@@ -420,10 +435,10 @@ function updatePhysics(dt) {
 
   const profile = DISCS[state.discType];
   const horizontalSpeed = Math.hypot(state.velocity.x, state.velocity.z);
-  const grounded = state.position.y <= REST_HEIGHT + 0.001 && state.velocity.y <= 0;
+  let groundY = course.groundHeight(state.position.x, state.position.z) + REST_HEIGHT;
+  const grounded = state.position.y <= groundY + 0.001 && state.velocity.y <= 0;
   if (grounded) {
-    // Snap the contact tolerance to the same plane used by the settle check.
-    state.position.y = REST_HEIGHT;
+    state.position.y = groundY;
     // Sliding friction only: low-speed fade must not keep accelerating a
     // grounded disc sideways indefinitely (especially the driver).
     state.velocity.y = 0;
@@ -473,14 +488,16 @@ function updatePhysics(dt) {
   const basketDz = state.position.z - target.z;
   const basketDist = Math.hypot(basketDx, basketDz);
   const speed = state.velocity.length();
-  const inChains = basketDist < 0.82 && state.position.y > 0.72 && state.position.y < 2.35;
-  const inTrayOrPole = basketDist < 0.55 && state.position.y > 0.22 && state.position.y < 1.05;
+  const relativeY = state.position.y - target.y;
+  const inChains = basketDist < 0.82 && relativeY > 0.72 && relativeY < 2.35;
+  const inTrayOrPole = basketDist < 0.55 && relativeY > 0.22 && relativeY < 1.05;
   if ((inChains || inTrayOrPole) && speed < 20) {
     finishHole();
     return;
   }
 
-  if (state.position.y <= REST_HEIGHT) {
+  groundY = course.groundHeight(state.position.x, state.position.z) + REST_HEIGHT;
+  if (state.position.y <= groundY) {
     // Casual park rule: a water landing costs one penalty stroke and returns
     // to the previous lie. Carrying over water is legal; dry routes stay free.
     const wet = course.water?.some(w => Math.hypot(state.position.x - w.x, state.position.z - w.z) < w.radius);
@@ -499,8 +516,15 @@ function updatePhysics(dt) {
       hud.toast('Water · +1 penalty · Rethrow from previous lie');
       return;
     }
-    state.position.y = REST_HEIGHT;
+    state.position.y = groundY;
+    const slope = course.groundNormal(state.position.x, state.position.z);
     const hSpeed = Math.hypot(state.velocity.x, state.velocity.z);
+    // Preserve meaningful downhill skips/roll-away without allowing gravity to
+    // restart a disc after friction has nearly settled it.
+    if (hSpeed > .3) {
+      state.velocity.x += slope.x * slope.y * 4.2 * dt;
+      state.velocity.z += slope.z * slope.y * 4.2 * dt;
+    }
     if (Math.abs(state.velocity.y) > 1.5 && hSpeed > 2.2) {
       state.velocity.y = -state.velocity.y * 0.16;
       state.velocity.x *= 0.58;
@@ -518,7 +542,7 @@ function updatePhysics(dt) {
       state.bank = 0;
       state.mode = 'aiming';
       state.lie.copy(state.position);
-      state.lie.y = REST_HEIGHT;
+      state.lie.y = groundY;
       state.power = 0;
       state.cameraView = 'first';
       state.cameraSnap = true;
@@ -529,8 +553,8 @@ function updatePhysics(dt) {
   }
 
   // Keep the disc inside the park grounds.
-  state.position.x = clamp(state.position.x, COURSE_BOUNDS.minX, COURSE_BOUNDS.maxX);
-  state.position.z = clamp(state.position.z, COURSE_BOUNDS.minZ, COURSE_BOUNDS.maxZ);
+  state.position.x = clamp(state.position.x, course.bounds.minX, course.bounds.maxX);
+  state.position.z = clamp(state.position.z, course.bounds.minZ, course.bounds.maxZ);
 }
 
 function updateCamera(dt) {
@@ -600,6 +624,7 @@ function updateHUD() {
 
   hud.update({
     hole: hole(),
+    courseName: course.name,
     holes: roundHoles,
     scores: state.scores,
     roundOver: state.scores.every(s => s !== null),
@@ -641,7 +666,7 @@ function animate(now) {
   updateAimLine();
   state.spin = (state.spin + state.spinRate * dt) % (Math.PI * 2);
   const settled = state.finished
-    ? new THREE.Vector3(hole().basket.x, 1.15, hole().basket.z)
+    ? new THREE.Vector3(hole().basket.x, hole().basket.y + 1.15, hole().basket.z)
     : state.position;
   disc.update(settled, state.bank, state.spin, state.mode === 'flying', state.flightHeading);
   updateHUD();

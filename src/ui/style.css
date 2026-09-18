@@ -111,9 +111,13 @@
 .pg-title-course { flex: 1; min-width: 0; }
 .pg-title-selected { display: flex; align-items: center; gap: 6px; color: #d1dcca; font-size: 8px; font-weight: 600; letter-spacing: .16em; }
 .pg-title-selected i { width: 5px; height: 5px; border-radius: 50%; background: #e8d4a5; }
-.pg-title-course h3 { margin: 7px 0; color: #fff6df; font-size: 23px; font-weight: 550; letter-spacing: -.025em; }
-.pg-title-course p { margin: 0; color: #d0dbd0; font-size: 12px; }
+.pg-title-course h3 { margin: 7px 0 2px; color: #fff6df; font-size: 23px; font-weight: 550; letter-spacing: -.025em; }
+.pg-title-course small { color: #aebdb3; font-size: 10px; }
+.pg-title-course p { margin: 5px 0 0; color: #d0dbd0; font-size: 12px; }
 .pg-title-course p span { padding: 0 5px; color: #9eaea4; }
+.pg-course-options { display: flex; gap: 6px; margin-bottom: 10px; }
+.pg-root .pg-course-options button { padding: 7px 10px; border: 1px solid #ffffff24; border-radius: 7px; color: #bdcbc1; font-size: 10px; background: #071d1838; }
+.pg-root .pg-course-options button.is-selected { border-color: #e8d4a5; color: #fff6df; }
 .pg-round-options { display: flex; gap: 6px; margin-top: 13px; }
 .pg-root .pg-round-options button { min-height: 34px; padding: 0 12px; border: 1px solid #ffffff24; border-radius: 7px; color: #cbd7ce; font-size: 11px; background: #071d1838; }
 .pg-root .pg-round-options button:hover { border-color: #e8d4a570; color: #fff6df; }
@@ -135,6 +139,20 @@
   .pg-round-options { margin-top: 11px; }
   .pg-root .pg-round-options button { flex: 1; min-height: 38px; padding: 0 5px; }
   .pg-root .pg-title-play { justify-content: space-between; }
+}
+@media (max-height: 600px) {
+  .pg-landing { padding-top: 14px; padding-bottom: 10px; gap: 18px; }
+  .pg-title-brand h2 { font-size: 48px; }
+  .pg-title-subtitle { margin-top: 4px; }
+  .pg-title-dock { padding: 9px 12px; gap: 8px; }
+  .pg-title-course h3 { font-size: 18px; margin: 3px 0 0; }
+  .pg-title-course small { display: none; }
+  .pg-course-options { margin-bottom: 5px; }
+  .pg-root .pg-course-options button { padding: 5px 6px; font-size: 9px; }
+  .pg-round-options { margin-top: 6px; }
+  .pg-root .pg-round-options button { min-height: 32px; }
+  .pg-root .pg-title-play { min-height: 44px; }
+  .pg-title-future { margin-top: 5px; }
 }
 @media (max-height: 500px) {
   .pg-landing { padding-top: max(16px, env(safe-area-inset-top)); padding-bottom: max(12px, env(safe-area-inset-bottom)); gap: 24px; }

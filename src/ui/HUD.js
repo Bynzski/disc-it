@@ -13,7 +13,7 @@ const resultLabel = (throws, par) => {
 };
 
 export class HUD {
-  constructor({ holes, onStartRound, onRestart, onToggleView, onSelectDisc, onReleaseMouse, onNextHole, onTouchControl, onTouchThrowStart, onTouchThrowEnd, onTouchThrowCancel, onTouchFlat }) {
+  constructor({ holes, onStartRound, onSelectCourse, onRestart, onToggleView, onSelectDisc, onReleaseMouse, onNextHole, onTouchControl, onTouchThrowStart, onTouchThrowEnd, onTouchThrowCancel, onTouchFlat }) {
     this.holes = holes;
     this.root = document.createElement('div');
     this.root.className = 'pg-root';
@@ -23,7 +23,7 @@ export class HUD {
         <div class="pg-course pg-glass">
           <div class="pg-hole-number" id="pg-hole-number">01</div>
           <div>
-            <div class="pg-eyebrow">TOCOBAGA PARK</div>
+            <div class="pg-eyebrow" id="pg-course-name">TOCOBAGA PARK</div>
             <h1 id="pg-hole-name">No. 1</h1>
             <div class="pg-meta" id="pg-hole-meta">Par 3 · 282 ft</div>
           </div>
@@ -83,7 +83,12 @@ export class HUD {
           <div class="pg-title-dock" aria-label="Course selection">
             <div class="pg-title-course">
               <span class="pg-title-selected"><i aria-hidden="true"></i> SELECTED COURSE</span>
-              <h3>Tocobaga Park</h3>
+              <div class="pg-course-options" role="radiogroup" aria-label="Select course">
+                <button type="button" data-course="tocobaga" role="radio" aria-checked="true" class="is-selected">Tocobaga Park</button>
+                <button type="button" data-course="thunderbird" role="radio" aria-checked="false">Thunderbird Gardens</button>
+              </div>
+              <h3 id="pg-selected-course">Tocobaga Park</h3>
+              <small id="pg-course-description">Original Florida city-park course</small>
               <p id="pg-round-summary">${holes.length} Holes <span>•</span> Par ${holes.reduce((sum, h) => sum + h.par, 0)} <span>•</span> ${holes.reduce((sum, h) => sum + h.lengthFeet, 0)} ft</p>
               <div class="pg-round-options" role="radiogroup" aria-label="Round format">
                 <button type="button" data-round-format="front" role="radio" aria-checked="false">Front 9</button>
@@ -123,10 +128,10 @@ export class HUD {
     document.body.appendChild(this.root);
     const get = id => this.root.querySelector(`#pg-${id}`);
     this.el = Object.fromEntries([
-      'hole-number', 'hole-name', 'hole-meta', 'throws', 'distance', 'crosshair', 'cross-angle',
+      'course-name', 'hole-number', 'hole-name', 'hole-meta', 'throws', 'distance', 'crosshair', 'cross-angle',
       'tilt-disc', 'disc-ratings', 'elevation', 'power-value', 'power-fill', 'throw-label',
       'status', 'view-toggle', 'view-label', 'restart', 'cursor', 'capture-hint',
-      'touch-throw', 'touch-power', 'touch-flat', 'toast', 'landing', 'start-round', 'round-summary', 'final', 'final-eyebrow', 'final-result', 'final-score', 'final-restart', 'next', 'scorecard', 'score-total', 'final-title',
+      'touch-throw', 'touch-power', 'touch-flat', 'toast', 'landing', 'start-round', 'round-summary', 'selected-course', 'course-description', 'final', 'final-eyebrow', 'final-result', 'final-score', 'final-restart', 'next', 'scorecard', 'score-total', 'final-title',
     ].map(id => [id, get(id)]));
     this.scoreCells = [...this.root.querySelectorAll('.pg-score-cell')];
     this.powerBar = this.root.querySelector('.pg-power');
@@ -140,11 +145,17 @@ export class HUD {
     this.el.cursor.addEventListener('click', () => onReleaseMouse?.());
     this.el['final-restart'].addEventListener('click', () => onRestart?.());
     this.el.next.addEventListener('click', () => onNextHole?.());
+    this.activeHoles = holes;
+    const courseInfo = {
+      tocobaga: { name: 'Tocobaga Park', description: 'Original Florida city-park course' },
+      thunderbird: { name: 'Thunderbird Gardens', description: 'Cedar City inspired high-desert course' },
+    };
+    this.courseButtons = [...this.root.querySelectorAll('[data-course]')];
     this.roundFormat = 'all';
     this.roundButtons = [...this.root.querySelectorAll('[data-round-format]')];
     const selectRound = format => {
       this.roundFormat = format;
-      const selected = format === 'front' ? holes.slice(0, 9) : format === 'back' ? holes.slice(9) : holes;
+      const selected = format === 'front' ? this.activeHoles.slice(0, 9) : format === 'back' ? this.activeHoles.slice(9) : this.activeHoles;
       for (const button of this.roundButtons) {
         const active = button.dataset.roundFormat === format;
         button.classList.toggle('is-selected', active);
@@ -152,6 +163,13 @@ export class HUD {
       }
       this.el['round-summary'].innerHTML = `${selected.length} Holes <span>•</span> Par ${selected.reduce((sum, h) => sum + h.par, 0)} <span>•</span> ${selected.reduce((sum, h) => sum + h.lengthFeet, 0)} ft`;
     };
+    for (const button of this.courseButtons) button.addEventListener('click', () => {
+      const id = button.dataset.course, info = courseInfo[id]; this.activeHoles = onSelectCourse?.(id) || this.activeHoles;
+      this.courseButtons.forEach(b => { const active=b===button;b.classList.toggle('is-selected',active);b.setAttribute('aria-checked',String(active)); });
+      this.el['selected-course'].textContent = info.name;
+      this.el['course-description'].textContent = info.description;
+      selectRound(this.roundFormat);
+    });
     for (const button of this.roundButtons) button.addEventListener('click', () => selectRound(button.dataset.roundFormat));
     this.el['start-round'].addEventListener('click', () => onStartRound?.(this.roundFormat));
 
@@ -221,6 +239,7 @@ export class HUD {
       button.disabled = !data.canSelectDisc;
     }
     this.el['disc-ratings'].textContent = profile.ratings;
+    this.el['course-name'].textContent = data.courseName.toUpperCase();
     this.el['hole-number'].textContent = String(hole.id).padStart(2, '0');
     this.el['hole-name'].textContent = hole.name;
     this.el['hole-meta'].textContent = `Par ${hole.par} · ${hole.lengthFeet} ft`;
@@ -248,7 +267,7 @@ export class HUD {
     this.el['touch-throw'].disabled = !canAim;
     this.el['capture-hint'].hidden = isLanding || data.mouseCaptured || data.mode !== 'aiming' || data.finished;
     this.el.final.hidden = isLanding || !data.finished;
-    this.el['final-eyebrow'].textContent = `TOCOBAGA · HOLE ${String(hole.id).padStart(2, '0')}`;
+    this.el['final-eyebrow'].textContent = `${data.courseName.toUpperCase()} · HOLE ${String(hole.id).padStart(2, '0')}`;
     const isLast = data.holeIndex + 1 >= data.holeCount;
     this.el.next.textContent = '';
     this.el.next.innerHTML = isLast
@@ -265,7 +284,7 @@ export class HUD {
       const throws = roundComplete ? total : data.throws;
       const diff = throws - par;
       const relative = diff === 0 ? 'Even' : `${diff > 0 ? '+' : ''}${diff}`;
-      this.el['final-eyebrow'].textContent = roundComplete ? 'TOCOBAGA PARK · ROUND SCORECARD' : `TOCOBAGA · HOLE ${hole.id}`;
+      this.el['final-eyebrow'].textContent = roundComplete ? `${data.courseName.toUpperCase()} · ROUND SCORECARD` : `${data.courseName.toUpperCase()} · HOLE ${hole.id}`;
       this.el['final-result'].textContent = roundComplete ? relative : resultLabel(throws, par);
       this.el['final-score'].textContent = `${throws} throws · Par ${par} · ${relative}`;
       this.scoreCells.forEach((cell, i) => {

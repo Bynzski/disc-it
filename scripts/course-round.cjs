@@ -5,14 +5,15 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/home/jay/.npm/_npx
  try {
   const page = await browser.newPage({viewport:{width:1280,height:800}});
   const errors=[]; page.on('pageerror', e=>errors.push(e.stack));
-  await page.route(/\/src\/main\.js(?:\?.*)?$/,async r=>{const response=await r.fetch();await r.fulfill({response,body:(await response.text())+'\nwindow.t={state,holes,colliders,course,renderer,scene,camera,disc,THREE,startHole,throwDisc,updatePhysics,updateHUD,nextHole,restartHole,updateCamera,hud,preview};'});});
+  await page.route(/\/src\/main\.js(?:\?.*)?$/,async r=>{const response=await r.fetch();await r.fulfill({response,body:(await response.text())+'\nwindow.t={state,get holes(){return holes},get colliders(){return colliders},get course(){return course},renderer,scene,camera,disc,THREE,startHole,throwDisc,updatePhysics,updateHUD,nextHole,restartHole,updateCamera,hud,preview};'});});
   await page.goto('http://localhost:5173');await page.waitForFunction(()=>!!window.t);
+  if(process.env.COURSE_ID) await page.locator(`[data-course="${process.env.COURSE_ID}"]`).click();
   await page.evaluate(()=>{t.renderer.setAnimationLoop(null);t.hud.toast=()=>{};window.playHole=()=>{
    const s=t.state,h=t.holes[s.holeIndex], trace=[];t.preview.skip();
    const originalToast=t.hud.toast; let hits=0;t.hud.toast=text=>{if(/kick|branches/.test(text))hits++;};
    function save(){return Object.fromEntries(Object.entries(s).map(([k,v])=>[k,v?.isVector3?v.clone():Array.isArray(v)?v.slice():v]));}
    function restore(snapshot){for(const [k,v]of Object.entries(snapshot))s[k]=v?.isVector3?v.clone():Array.isArray(v)?v.slice():v;}
-   function shot(type,power,elevation,yaw,bank=0){Object.assign(s,{discType:type,power,elevation,aimYaw:yaw,releaseAngle:bank});hits=0;t.throwDisc();let k=0;while(s.mode==='flying'&&k++<900)t.updatePhysics(1/60);if(s.mode==='flying')throw Error('Never settled');return hits;}
+   function shot(type,power,elevation,yaw,bank=0){Object.assign(s,{discType:type,power,elevation,aimYaw:yaw,releaseAngle:bank});hits=0;t.throwDisc();let k=0;while(s.mode==='flying'&&k++<2400)t.updatePhysics(1/60);if(s.mode==='flying')throw Error('Never settled');return hits;}
    const teeSnapshot=save();const pinYaw=Math.atan2(h.basket.x-s.lie.x,h.basket.z-s.lie.z);
    const directHits=shot('driver',1,.32,pinYaw);const directRemaining=s.lie.distanceTo(h.basket)*3.05;restore(teeSnapshot);
    // Walk the designed centerline by making real physics throws from each lie.

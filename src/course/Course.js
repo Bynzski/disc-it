@@ -190,5 +190,7 @@ export function buildCourse(scene) {
   holes.slice(9).forEach(buildHole);
   strip(scene, [4, 244], [10, 235], 1.7, sand, .021);
   environment.dressing = addCourseDressing(scene, holes, colliders, environment.placements);
-  return { holes, colliders, baskets, water: WATER, environment };
+  return { holes, colliders, baskets, water: WATER, environment,
+    bounds: COURSE_BOUNDS, groundHeight: () => 0, groundNormal: () => new THREE.Vector3(0, 1, 0),
+    palette: { sky: 0x9cc9e2, fog: 0x9cc9e2 }, name: COURSE_NAME };
 }
