@@ -8,9 +8,16 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:course": "node scripts/validate-course.cjs",
-    "test:preview": "node scripts/preview-test.cjs"
+    "test:preview": "node scripts/preview-test.cjs",
+    "test:cedar": "node scripts/cedar-test.cjs",
+    "test:thunderbird": "node scripts/thunderbird-routing-test.cjs",
+    "server": "node server/index.js",
+    "test:leaderboard": "node --test scripts/leaderboard-test.cjs scripts/runmode-test.cjs",
+    "test:runmode-browser": "node scripts/runmode-browser-test.cjs"
   },
   "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "express": "^4.22.3",
     "three": "^0.170.0"
   },
   "devDependencies": {
