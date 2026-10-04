@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 make g+
 COPY package.json package-lock.json ./
 RUN npm ci --include=dev
 COPY index.html vite.config.js ./
+COPY public ./public
 COPY src ./src
 COPY server ./server
 COPY scripts ./scripts
