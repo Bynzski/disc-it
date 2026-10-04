@@ -133,8 +133,8 @@ export class HUD {
               </div>
             </div>
             <div class="pg-play-group">
-              <button type="button" id="pg-start-round" class="pg-title-play" aria-keyshortcuts="Enter Space" aria-label="Play course: Tocobaga Park"><svg aria-hidden="true" viewBox="0 0 24 24" width="26" height="26"><path d="M7 3.5 20 12 7 20.5Z" fill="currentColor" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg><span>Play</span></button>
-              <button type="button" id="pg-start-run" class="pg-title-play pg-title-run" aria-label="Play a leaderboard run" title="Every throw counts: no restarts. Finish the round to post your score to the leaderboard."><svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3M12 14v4M8 20h8"/></svg><span>Leaderboard</span></button>
+              <button type="button" id="pg-start-round" class="pg-title-play" aria-keyshortcuts="Enter Space" aria-label="Free play: Tocobaga Park"><svg aria-hidden="true" viewBox="0 0 24 24" width="26" height="26"><path d="M7 3.5 20 12 7 20.5Z" fill="currentColor" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg><span>Free Play</span></button>
+              <button type="button" id="pg-start-run" class="pg-title-play pg-title-run" aria-label="Play ranked: leaderboard run" title="Every throw counts: no restarts. Finish the round to post your score to the leaderboard."><svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24"><path d="M7 3.5 20 12 7 20.5Z" fill="currentColor" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg><span>Ranked Play</span></button>
             </div>
           </div>
           <aside class="pg-board" aria-label="Leaderboard">
@@ -238,7 +238,7 @@ export class HUD {
       this.courseButtons.forEach(b => { const active=b===button;b.classList.toggle('is-selected',active);b.setAttribute('aria-checked',String(active)); });
       this.el['selected-course'].textContent = info.name;
       this.el['course-description'].textContent = info.description;
-      this.el['start-round'].setAttribute('aria-label', `Play course: ${info.name}`);
+      this.el['start-round'].setAttribute('aria-label', `Free play: ${info.name}`);
       selectRound(this.roundFormat);
     });
     for (const button of this.roundButtons) button.addEventListener('click', () => selectRound(button.dataset.roundFormat));
