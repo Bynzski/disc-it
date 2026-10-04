@@ -79,3 +79,51 @@ for (const [label, body] of [['null', null], ['string', 'x'], ['array', []], ['u
     assert.equal(courses.validateSubmission(body).ok, false);
   });
 }
+
+// ---- storage ----
+let openDb;
+before(async () => { ({ openDb } = await import('../server/db.js')); });
+
+const round = (over = {}) => ({ name: 'A', course: 'tocobaga', format: 'all', holes: Array(18).fill(3), totalThrows: 54, parDiff: 0, holeOffset: 0, ...over });
+
+test('ranking: better par diff first, earlier wins ties, rank returned on insert', () => {
+  const db = openDb(':memory:');
+  assert.equal(db.addRound(round({ name: 'A', parDiff: 2 }), 1).rank, 1);
+  assert.equal(db.addRound(round({ name: 'B', parDiff: -1 }), 2).rank, 1);
+  assert.equal(db.addRound(round({ name: 'C', parDiff: 2 }), 3).rank, 3); // ties A, but later
+  const rows = db.leaderboard('tocobaga', 'all', 10);
+  assert.deepEqual(rows.map(r => [r.rank, r.name, r.parDiff]), [[1, 'B', -1], [2, 'A', 2], [3, 'C', 2]]);
+  db.close();
+});
+
+test('ties inside the same millisecond fall back to insertion order', () => {
+  const db = openDb(':memory:');
+  db.addRound(round({ name: 'first' }), 5);
+  assert.equal(db.addRound(round({ name: 'second' }), 5).rank, 2);
+  assert.deepEqual(db.leaderboard('tocobaga', 'all', 10).map(r => r.name), ['first', 'second']);
+  db.close();
+});
+
+test('boards are separate per course and format; limit applies', () => {
+  const db = openDb(':memory:');
+  for (let i = 0; i < 5; i++) db.addRound(round({ name: `p${i}`, parDiff: i }), i);
+  db.addRound(round({ course: 'forest', parDiff: -9 }), 10);
+  db.addRound(round({ format: 'front', holes: Array(9).fill(3), parDiff: -9 }), 11);
+  assert.equal(db.leaderboard('tocobaga', 'all', 10).length, 5);
+  assert.equal(db.leaderboard('tocobaga', 'all', 3).length, 3);
+  assert.equal(db.leaderboard('forest', 'all', 10).length, 1);
+  assert.equal(db.leaderboard('thunderbird', 'all', 10).length, 0);
+  db.close();
+});
+
+test('back-nine rounds store absolute hole indexes 9..17', () => {
+  const db = openDb(':memory:');
+  db.addRound(round({ format: 'front', holes: [2, 2, 2, 2, 2, 2, 2, 2, 2], holeOffset: 0 }), 1);
+  db.addRound(round({ format: 'back', holes: [5, 5, 5, 5, 5, 5, 5, 5, 5], holeOffset: 9 }), 2);
+  const rows = db.holeAverages('tocobaga');
+  assert.deepEqual(rows.map(r => r.holeIndex), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]);
+  assert.equal(rows[0].avgThrows, 2);
+  assert.equal(rows[9].avgThrows, 5);
+  assert.equal(rows[9].rounds, 1);
+  db.close();
+});
