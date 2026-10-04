@@ -84,6 +84,37 @@ async function startPlaying(page) {
       assert.deepEqual(after, { finished: true, holeIndex: 0, scores: 18, throwsSet: true });
       await page.close();
     }
+    // 5. Name prompt: Enter spam posts once; N cannot discard the run; the input gets focus.
+    {
+      const { page } = await openGame(browser, []);
+      let posts = 0;
+      await page.route('**/api/rounds', async route => {
+        posts++;
+        await new Promise(r => setTimeout(r, 600));
+        await route.fulfill({ status: 201, json: { id: 1, rank: 1 } });
+      });
+      await page.click('#pg-mode-toggle');
+      await startPlaying(page);
+      await page.evaluate(() => {
+        const s = window.__discState;
+        s.scores = s.scores.map(() => 3);
+        s.holeIndex = s.scores.length - 1;
+        s.finished = true;
+        s.runResult = { phase: 'name' };
+      });
+      await page.waitForSelector('#pg-run-name-input', { state: 'visible' });
+      assert.equal(await page.evaluate(() => document.activeElement?.id), 'pg-run-name-input', 'name input is focused');
+      await page.evaluate(() => document.activeElement.blur());
+      await page.keyboard.press('n');
+      const afterN = await page.evaluate(() => ({ landing: window.__discState.showLanding, run: window.__discState.runMode }));
+      assert.deepEqual(afterN, { landing: false, run: true }, 'N must not leave the run while the name prompt is showing');
+      await page.fill('#pg-run-name-input', 'Spam');
+      // The form hides after the first submit, so key presses can't reach it; submit it directly to hit the wiring.
+      await page.evaluate(() => { const form = document.querySelector('#pg-run-form'); for (let i = 0; i < 4; i++) form.requestSubmit(); });
+      await page.waitForFunction(() => /You ranked/.test(document.querySelector('#pg-run-status').textContent));
+      assert.equal(posts, 1, 'one run posts once');
+      await page.close();
+    }
     console.log('run-mode browser checks passed');
   } finally {
     await browser.close();

@@ -101,3 +101,18 @@ test('leaderboardApi builds the right requests', async () => {
   await assert.rejects(submitRun({ name: 'a', course: 'x', format: 'all', holes: [] }), err => err.status === 400 && /unknown course/.test(err.message));
   assert.equal(calls[1][1].method, 'POST');
 });
+
+test('canPost: only when nothing is posting or posted yet', async () => {
+  const { canPost } = await load('runMode.js');
+  assert.equal(canPost(null), true);
+  assert.equal(canPost({ phase: 'name' }), true);
+  assert.equal(canPost({ phase: 'error', message: 'x' }), true);
+  assert.equal(canPost({ phase: 'posting' }), false);
+  assert.equal(canPost({ phase: 'done', rank: 1 }), false);
+});
+
+test('recordedThrows caps a hole at the 15 throws the server accepts', async () => {
+  const { recordedThrows, MAX_HOLE_THROWS } = await load('runMode.js');
+  assert.equal(MAX_HOLE_THROWS, 15);
+  assert.deepEqual([1, 3, 15, 16, 40].map(recordedThrows), [1, 3, 15, 15, 15]);
+});
