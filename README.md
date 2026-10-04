@@ -43,7 +43,7 @@ npm run build && npm run server   # serves the game and the API on PORT (default
 npm run dev                       # development: run `npm run server` too; Vite proxies /api to port 3000
 ```
 
-- Scores live in `data/scores.db` (override with `DB_PATH`). To back up, copy that file.
+- Scores live in `data/scores.db` (override with `DB_PATH`). While the server is running, back up with SQLite's online backup API; copying only the main file can omit committed WAL data. The VPS runbook includes the tested backup helper.
 - Put your usual reverse proxy in front and forward everything to the Node port, passing `X-Forwarded-For` so the rate limit (about 5 posts a minute per IP) sees real addresses. The server only trusts forwarded addresses from a proxy on the same machine.
 - Minimal systemd unit:
 
