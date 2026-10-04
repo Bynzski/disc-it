@@ -32,6 +32,29 @@ npm run preview
 
 Water landings cost one penalty stroke and return to the previous lie.
 
+## Leaderboard
+
+The title screen has a **Leaderboard run** toggle. In a run, restarting and replaying holes is disabled; finishing the round posts your score to a shared board, kept separately per course and round format (Front 9, Back 9, All 18). **Free play** is unchanged and never posts. Your name and personal bests are remembered in the browser. The top 10 for the selected course and format is shown on the title screen.
+
+A small Express + SQLite server stores the scores (light validation only: no accounts, so it is not tamper-proof).
+
+```sh
+npm run build && npm run server   # serves the game and the API on PORT (default 3000)
+npm run dev                       # development: run `npm run server` too; Vite proxies /api to port 3000
+```
+
+- Scores live in `data/scores.db` (override with `DB_PATH`). To back up, copy that file.
+- Put your usual reverse proxy in front and forward everything to the Node port, passing `X-Forwarded-For` so the rate limit (about 5 posts a minute per IP) sees real addresses. The server only trusts forwarded addresses from a proxy on the same machine.
+- Minimal systemd unit:
+
+```ini
+[Service]
+WorkingDirectory=/path/to/disc-it
+Environment=PORT=3000
+ExecStart=/usr/bin/node server/index.js
+Restart=on-failure
+```
+
 ## Tests
 
 Browser tests require Playwright with Chromium and a development server at `http://localhost:5173`. Install Playwright separately and set `PLAYWRIGHT_PATH` to its module path (the scripts otherwise fall back to the original development machine's installation).
@@ -41,5 +64,7 @@ npm run test:course
 npm run test:preview
 node scripts/bank-alignment.cjs
 ```
+
+Leaderboard server and helper tests need no browser: `npm run test:leaderboard`. The run-mode browser checks need the dev server: `npm run test:runmode-browser`.
 
 The course is inspired by coastal Florida parks; it is not a surveyed recreation of the real Tocobaga course. Flight is a simplified gameplay model, not a full aerodynamic simulation.
