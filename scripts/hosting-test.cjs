@@ -50,7 +50,7 @@ test('default Vite build and development keep root hosting', async t => {
   const html = output.output.find(asset => asset.fileName === 'index.html').source;
   assert.match(html, /src="\/assets\//);
   assert.match(html, /href="\/assets\//);
-  assert(!html.includes('/disk-it/'));
+  assert(!html.includes('/disk-it/assets/')); // absolute canonical/social URLs may mention /disk-it/
   const api = await builtApi('/');
   const calls = [];
   t.mock.method(globalThis, 'fetch', async url => {
