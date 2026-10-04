@@ -39,10 +39,10 @@ test('production image serves subpath assets with a read-only root and persisten
   assert.equal(docker('exec', first, 'sh', '-c', 'command -v python3 || command -v g++ || true'), '');
   const html = request(first, '/');
   assert.equal(html.status, 200);
-  const assets = [...html.body.matchAll(/(?:src|href)="(\/disk-it\/assets\/[^\"]+)"/g)].map(m => m[1]);
-  assert(assets.length >= 2, 'JS and CSS assets must use /disk-it/');
-  // Caddy strips /disk-it before forwarding to Express.
-  for (const asset of assets) assert.equal(request(first, asset.slice('/disk-it'.length)).status, 200);
+  const assets = [...html.body.matchAll(/(?:src|href)="(\/disc-it\/assets\/[^\"]+)"/g)].map(m => m[1]);
+  assert(assets.length >= 2, 'JS and CSS assets must use /disc-it/');
+  // Caddy strips /disc-it before forwarding to Express.
+  for (const asset of assets) assert.equal(request(first, asset.slice('/disc-it'.length)).status, 200);
   const posted = request(first, '/api/rounds', {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ name: 'Docker test', course: 'forest', format: 'front', holes: Array(9).fill(3) }),

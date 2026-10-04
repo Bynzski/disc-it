@@ -34,10 +34,10 @@ test('server binds only the requested BIND_HOST', async t => {
 test('Vite uses VITE_BASE_PATH for deployment assets', async t => {
   const previous = process.env.VITE_BASE_PATH;
   t.after(() => { if (previous === undefined) delete process.env.VITE_BASE_PATH; else process.env.VITE_BASE_PATH = previous; });
-  process.env.VITE_BASE_PATH = '/disk-it/';
+  process.env.VITE_BASE_PATH = '/disc-it/';
   const { resolveConfig } = await import('vite');
   const config = await resolveConfig({ root }, 'build');
-  assert.equal(config.base, '/disk-it/');
+  assert.equal(config.base, '/disc-it/');
 });
 
 test('default Vite build and development keep root hosting', async t => {
@@ -50,7 +50,7 @@ test('default Vite build and development keep root hosting', async t => {
   const html = output.output.find(asset => asset.fileName === 'index.html').source;
   assert.match(html, /src="\/assets\//);
   assert.match(html, /href="\/assets\//);
-  assert(!html.includes('/disk-it/assets/')); // absolute canonical/social URLs may mention /disk-it/
+  assert(!html.includes('/disc-it/assets/')); // absolute canonical/social URLs may mention /disc-it/
   const api = await builtApi('/');
   const calls = [];
   t.mock.method(globalThis, 'fetch', async url => {
@@ -72,7 +72,7 @@ async function builtApi(base) {
 }
 
 test('built leaderboard request uses the deployment subpath', async t => {
-  const api = await builtApi('/disk-it/');
+  const api = await builtApi('/disc-it/');
   const calls = [];
   t.mock.method(globalThis, 'fetch', async (url, init) => {
     calls.push([url, init]);
@@ -80,12 +80,12 @@ test('built leaderboard request uses the deployment subpath', async t => {
   });
   const signal = new AbortController().signal;
   assert.deepEqual(await api.fetchBoard('forest', 'front', { signal }), [{ rank: 1 }]);
-  assert.equal(calls[0][0], '/disk-it/api/leaderboard?course=forest&format=front&limit=10');
+  assert.equal(calls[0][0], '/disc-it/api/leaderboard?course=forest&format=front&limit=10');
   assert.equal(calls[0][1].signal, signal);
 });
 
 test('built round submission uses the deployment subpath', async t => {
-  const api = await builtApi('/disk-it/');
+  const api = await builtApi('/disc-it/');
   const calls = [];
   t.mock.method(globalThis, 'fetch', async (url, init) => {
     calls.push([url, init]);
@@ -93,7 +93,7 @@ test('built round submission uses the deployment subpath', async t => {
   });
   const payload = { name: 'Jay', course: 'forest', format: 'front', holes: Array(9).fill(3) };
   assert.deepEqual(await api.submitRun(payload), { id: 7, rank: 1 });
-  assert.equal(calls[0][0], '/disk-it/api/rounds');
+  assert.equal(calls[0][0], '/disc-it/api/rounds');
   assert.equal(calls[0][1].method, 'POST');
   assert.deepEqual(JSON.parse(calls[0][1].body), payload);
 });

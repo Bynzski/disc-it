@@ -10,7 +10,7 @@ COPY public ./public
 COPY src ./src
 COPY server ./server
 COPY scripts ./scripts
-ARG VITE_BASE_PATH=/disk-it/
+ARG VITE_BASE_PATH=/disc-it/
 ENV VITE_BASE_PATH=${VITE_BASE_PATH}
 RUN npm run test:leaderboard \
     && node --test scripts/hosting-test.cjs \
