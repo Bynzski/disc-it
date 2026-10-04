@@ -5,6 +5,8 @@ import { buildCedarCourse } from './course/CedarCourse.js';
 import { collideBoulder } from './course/Boulder.js';
 import { Disc, DISCS } from './entities/Disc.js';
 import { HUD } from './ui/HUD.js';
+import { MusicControl } from './ui/MusicControl.js';
+import { createMusic } from './audio/Music.js';
 import { HolePreviewController } from './camera/HolePreviewController.js';
 import { MODES, canRestart, canPost, recordedThrows } from './game/runMode.js';
 import { createPersonalStore } from './game/personal.js';
@@ -185,6 +187,11 @@ const hud = new HUD({
   onTouchThrowCancel: cancelTouchThrow,
   onTouchFlat: resetTouchTilt,
 });
+
+// Background music starts on the first click/key (browsers block audio until then).
+const music = createMusic();
+new MusicControl(hud.root, music);
+for (const type of ['pointerdown', 'keydown']) window.addEventListener(type, () => music.start(), { once: true, capture: true });
 
 const preview = new HolePreviewController({
   camera,
@@ -844,7 +851,7 @@ window.addEventListener('mousemove', (e) => {
 window.addEventListener('mousedown', (e) => {
   if (performance.now() < touchAim.suppressMouseUntil) return;
   if (e.button !== 0 || state.showLanding || state.mode !== 'aiming' || state.finished) return;
-  if (e.target.closest?.('button')) return;
+  if (e.target.closest?.('button, .pg-music')) return;
   if (!state.mouseCaptured) {
     requestMouseCapture();
     return;
@@ -893,6 +900,7 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.key === 'r' || e.key === 'R') restartHole();
   if (e.key === 'v' || e.key === 'V') toggleCameraView();
+  if (e.key === 'm' || e.key === 'M') music.toggleMute();
   if ((e.key === 'n' || e.key === 'N') && !namePromptBlocksLeaving()) nextHole();
 });
 

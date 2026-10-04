@@ -541,3 +541,18 @@
   .pg-title-future { margin-top: 10px; }
   .pg-title-menu .pg-board { margin-top: 0; }
 }
+
+/* ---- Music control: speaker button, slider reveals on hover / focus ---- */
+.pg-music { position: absolute; left: 20px; bottom: 22px; display: flex; align-items: center; gap: 8px; z-index: 60; }
+.pg-root .pg-music-btn { display: grid; place-items: center; width: 46px; height: 46px; padding: 0; border-radius: 15px; }
+@media (hover: hover) { .pg-root .pg-music-btn:hover { transform: translateY(-2px); box-shadow: 0 7px 0 var(--ink); background: #fff; } }
+.pg-music-x { display: none; }
+.pg-music.is-muted .pg-music-x { display: inline; }
+.pg-music.is-muted .pg-music-waves { display: none; }
+.pg-music.is-muted .pg-music-btn { background: var(--paper-2); color: var(--muted); }
+.pg-music-slider { display: flex; align-items: center; height: 46px; padding: 0 14px; border-radius: 15px; pointer-events: auto; opacity: 0; transform: translateX(-8px); width: 0; padding-inline: 0; overflow: hidden; border-width: 0; transition: opacity 140ms, transform 140ms, width 140ms; }
+.pg-music:hover .pg-music-slider, .pg-music:focus-within .pg-music-slider { opacity: 1; transform: none; width: 140px; padding-inline: 14px; border-width: 3px; }
+.pg-music-slider input { width: 100%; accent-color: var(--coral); cursor: pointer; pointer-events: auto; }
+.pg-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-width: 700px), (max-height: 560px) and (pointer: coarse) { .pg-music { left: auto; right: 12px; top: 96px; bottom: auto; } .pg-music { flex-direction: row-reverse; } }
+@media (hover: none) { .pg-music-slider { display: none; } }
