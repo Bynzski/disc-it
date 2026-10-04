@@ -127,3 +127,98 @@ test('back-nine rounds store absolute hole indexes 9..17', () => {
   assert.equal(rows[9].rounds, 1);
   db.close();
 });
+
+// ---- HTTP ----
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
+async function start(opts = {}) {
+  const { createApp } = await import('../server/app.js');
+  const db = openDb(':memory:');
+  const app = createApp({ db, ...opts });
+  const server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  return {
+    base, db,
+    close: () => new Promise(resolve => { server.closeAllConnections?.(); server.close(() => { db.close(); resolve(); }); }),
+    post: (body, init = {}) => fetch(`${base}/api/rounds`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: typeof body === 'string' ? body : JSON.stringify(body), ...init }),
+  };
+}
+const payload = (over = {}) => ({ name: 'Jay', course: 'tocobaga', format: 'front', holes: Array(9).fill(3), ...over });
+
+test('POST then GET: valid round is stored and ranked', async () => {
+  const s = await start();
+  try {
+    const first = await s.post(payload());
+    assert.equal(first.status, 201);
+    assert.deepEqual(Object.keys(await first.json()).sort(), ['id', 'rank']);
+    const better = await s.post(payload({ name: 'Pro', holes: Array(9).fill(2) }));
+    assert.equal((await better.json()).rank, 1);
+    const board = await (await fetch(`${s.base}/api/leaderboard?course=tocobaga&format=front`)).json();
+    assert.deepEqual(board.rows.map(r => r.name), ['Pro', 'Jay']);
+    assert.equal(board.rows[0].rank, 1);
+  } finally { await s.close(); }
+});
+
+test('leaderboard query validation and limit clamping', async () => {
+  const s = await start();
+  try {
+    assert.equal((await fetch(`${s.base}/api/leaderboard?course=nope&format=all`)).status, 400);
+    assert.equal((await fetch(`${s.base}/api/leaderboard?course=__proto__&format=all`)).status, 400);
+    assert.equal((await fetch(`${s.base}/api/leaderboard?course=forest&format=half`)).status, 400);
+    assert.equal((await fetch(`${s.base}/api/leaderboard?course=forest`)).status, 400);
+    assert.equal((await fetch(`${s.base}/api/leaderboard?course=forest&format=all&limit=abc`)).status, 200);
+    assert.equal((await fetch(`${s.base}/api/leaderboard?course=forest&format=all&limit=9999`)).status, 200);
+  } finally { await s.close(); }
+});
+
+test('hostile bodies get clean 4xx JSON, never 500', async () => {
+  const s = await start({ rateLimit: { max: 1000, windowMs: 60_000 } }); // this test sends more than 5 posts
+  try {
+    for (const body of ['{not json', '', 'null', '[]', '"text"', JSON.stringify(payload({ holes: '123456789' })), JSON.stringify(payload({ course: '__proto__' }))]) {
+      const res = await s.post(body);
+      assert(res.status >= 400 && res.status < 500, `${body} -> ${res.status}`);
+      assert.equal(typeof (await res.json()).error, 'string');
+    }
+    const huge = await s.post(JSON.stringify(payload({ name: 'x'.repeat(10000) })));
+    assert.equal(huge.status, 413);
+    const wrongType = await fetch(`${s.base}/api/rounds`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify(payload()) });
+    assert.equal(wrongType.status, 400);
+  } finally { await s.close(); }
+});
+
+test('rate limit: 5 per minute per IP, recovers after the window', async () => {
+  let t = 1_000_000;
+  const s = await start({ now: () => t, rateLimit: { max: 5, windowMs: 60_000 } });
+  try {
+    for (let i = 0; i < 5; i++) assert.equal((await s.post(payload())).status, 201);
+    const blocked = await s.post(payload());
+    assert.equal(blocked.status, 429);
+    assert(Number(blocked.headers.get('retry-after')) > 0);
+    t += 61_000;
+    assert.equal((await s.post(payload())).status, 201);
+  } finally { await s.close(); }
+});
+
+test('hole averages endpoint and unknown routes', async () => {
+  const s = await start();
+  try {
+    await s.post(payload({ format: 'back', holes: Array(9).fill(4) }));
+    const rows = (await (await fetch(`${s.base}/api/holes/tocobaga`)).json()).rows;
+    assert.deepEqual(rows.map(r => r.holeIndex), [9, 10, 11, 12, 13, 14, 15, 16, 17]);
+    assert.equal((await fetch(`${s.base}/api/holes/__proto__`)).status, 400);
+    assert.equal((await fetch(`${s.base}/api/nope`)).status, 404);
+  } finally { await s.close(); }
+});
+
+test('serves the built game from staticDir', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lb-static-'));
+  fs.writeFileSync(path.join(dir, 'index.html'), '<title>game</title>');
+  const s = await start({ staticDir: dir });
+  try {
+    const res = await fetch(`${s.base}/`);
+    assert.equal(res.status, 200);
+    assert.match(await res.text(), /<title>game<\/title>/);
+  } finally { await s.close(); fs.rmSync(dir, { recursive: true, force: true }); }
+});
