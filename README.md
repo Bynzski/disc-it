@@ -34,7 +34,7 @@ Water landings cost one penalty stroke and return to the previous lie.
 
 ## Leaderboard
 
-The title screen has a **Leaderboard run** toggle. In a run, restarting and replaying holes is disabled; finishing the round posts your score to a shared board, kept separately per course and round format (Front 9, Back 9, All 18). **Free play** is unchanged and never posts. Your name and personal bests are remembered in the browser. The top 10 for the selected course and format is shown on the title screen.
+The title screen has separate **Play** (free play) and **Leaderboard** (run) buttons. In a run, restarting and replaying holes is disabled; finishing the round posts your score to a shared board, kept separately per course and round format (Front 9, Back 9, All 18). **Free play** is unchanged and never posts. Your name and personal bests are remembered in the browser. The top 10 for the selected course and format is shown on the title screen.
 
 A small Express + SQLite server stores the scores (light validation only: no accounts, so it is not tamper-proof).
 

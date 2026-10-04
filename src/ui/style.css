@@ -81,8 +81,13 @@
 @keyframes pg-bump { 0% { transform: scale(1); } 30% { transform: scale(1.55) rotate(-6deg); } 100% { transform: scale(1); } }
 
 /* ---------- Shot panel ---------- */
-.pg-panel { position: absolute; left: 20px; bottom: 22px; width: 392px; padding: 12px 14px 14px; }
-.pg-panel-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.pg-panel { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); width: 392px; padding: 0; }
+.pg-panel-heading { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 12px; }
+/* Power meter: floats above the bag and only exists while the throw is charging. */
+.pg-charge { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); padding: 8px 12px 10px; border: 3px solid var(--ink); border-radius: 16px; background: var(--paper); box-shadow: 0 4px 0 var(--ink); opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity 120ms, transform 120ms; }
+.pg-charge.is-active { opacity: 1; transform: none; }
+.pg-charge .pg-shot-row { margin: 0 0 6px; }
+.pg-charge .pg-power { height: 24px; border-radius: 10px; }
 .pg-panel-title { font: 900 17px var(--display); }
 #pg-disc-ratings { padding: 1px 9px; border-radius: 999px; background: var(--paper-2); border: 2px solid var(--ink); color: var(--ink); font-size: 13px; font-weight: 800; }
 .pg-disc-selector { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; padding-bottom: 4px; }
@@ -128,7 +133,7 @@
 .pg-root .pg-actions button { display: flex; align-items: center; gap: 8px; min-height: 46px; padding: 0 14px; border-radius: 15px; font-size: 15px; font-weight: 900; }
 .pg-root .pg-actions button[aria-pressed="true"] { background: var(--sun); }
 .pg-capture-hint {
-  position: absolute; bottom: 36px; left: 50%; transform: translateX(-50%);
+  position: absolute; bottom: 168px; left: 50%; transform: translateX(-50%);
   padding: 8px 18px 9px; border: 3px solid var(--sun); border-radius: 999px; background: var(--ink); color: var(--paper);
   font: 900 16px var(--display); animation: pg-hint-bob 1.2s ease-in-out infinite;
 }
@@ -403,7 +408,7 @@
   .pg-stat b { font-size: 25px; white-space: nowrap; }
   .pg-stat small { font-size: 12px; }
   .pg-stat .pg-eyebrow { white-space: nowrap; }
-  .pg-panel { left: 12px; bottom: 14px; width: min(392px, calc(100vw - 24px)); }
+  .pg-panel { bottom: 14px; width: min(392px, calc(100vw - 24px)); }
   .pg-actions { right: 12px; bottom: 211px; }
   .pg-toast { top: 112px; }
 }
@@ -417,8 +422,8 @@
 @media (max-width: 700px), (hover: none) and (pointer: coarse) { .pg-touch-controls { right: 12px; bottom: 192px; } }
 /* Phone portrait: disc bag only at the bottom, touch controls above it. */
 @media (max-width: 430px) and (orientation: portrait) {
-  .pg-panel { left: 10px; right: 10px; bottom: 12px; width: auto; padding: 8px; border-radius: 16px; }
-  .pg-panel-heading, .pg-shot-row, .pg-power, .pg-shot-footer { display: none; }
+  .pg-panel { left: 10px; right: 10px; bottom: 12px; width: auto; transform: none; padding: 0; }
+  .pg-panel-heading, .pg-charge { display: none; }
   .pg-disc-selector { gap: 7px; padding-bottom: 3px; }
   .pg-disc-selector button { flex-direction: row; justify-content: center; gap: 6px; min-height: 48px; padding: 6px 4px; font-size: 13px; }
   .pg-disc-icon { width: 28px; height: 12px; border-width: 2px; }
@@ -446,8 +451,8 @@
   .pg-touch-aim-hint { font-size: 12px; }
   .pg-touch-throw { min-height: 56px; }
   .pg-touch-throw b { font-size: 20px; }
-  .pg-panel { left: 10px; bottom: 12px; width: 330px; padding: 7px; border-radius: 16px; }
-  .pg-panel-heading, .pg-shot-row, .pg-power, .pg-shot-footer { display: none; }
+  .pg-panel { left: 10px; bottom: 12px; width: 330px; padding: 0; transform: none; }
+  .pg-panel-heading, .pg-charge { display: none; }
   .pg-disc-selector { gap: 6px; padding-bottom: 3px; }
   .pg-disc-selector button { flex-direction: row; justify-content: center; gap: 6px; min-height: 44px; padding: 4px; font-size: 13px; }
   .pg-disc-icon { width: 26px; height: 11px; border-width: 2px; }
@@ -475,6 +480,9 @@
 .pg-root [hidden] { display: none !important; }
 .pg-play-group { grid-area: play; display: flex; flex-direction: column; align-self: stretch; gap: 8px; min-width: 0; }
 .pg-root .pg-play-group .pg-title-play { grid-area: auto; flex: 1 1 auto; }
+.pg-root .pg-title-run { background: var(--sun); animation-delay: .18s; }
+@media (hover: hover) { .pg-root .pg-title-run:hover:not(:disabled) { background: #ffd95a; } }
+.pg-root .pg-title-run { font-size: 28px; }
 .pg-root .pg-mode-chip { min-height: 34px; padding: 0 14px; border: 3px solid var(--ink); border-radius: 999px; background: var(--paper-2); color: var(--ink); font: 900 14px var(--font); white-space: nowrap; }
 @media (hover: hover) { .pg-root .pg-mode-chip:not(.is-selected):hover { background: #fff; } }
 .pg-root .pg-mode-chip.is-selected { background: var(--ink); color: var(--sun); }
@@ -491,7 +499,45 @@
 .pg-run-status { margin: 0; font: 900 16px var(--display); }
 @media (max-width: 640px) { .pg-board { max-width: none; } }
 /* Wide screens have room beside the menu: keep the board visible without scrolling. */
-@media (min-width: 1340px) {
+@media (min-width: 1500px) {
   .pg-title-menu { position: relative; }
   .pg-title-menu .pg-board { position: absolute; left: calc(100% + 18px); top: 0; width: 280px; margin-top: 0; }
+}
+
+/* ---- Compact title screen (desktop): one slim framed bar, course tabs over a single control row ---- */
+@media (min-width: 701px) and (min-height: 561px) {
+  .pg-landing { gap: 16px; padding-top: max(22px, env(safe-area-inset-top)); padding-bottom: max(18px, env(safe-area-inset-bottom)); }
+  .pg-title-brand h2 { font-size: clamp(60px, 7vw, 96px); }
+  .pg-title-subtitle { margin-top: 6px; font-size: 14px; padding: 3px 16px 4px; }
+  .pg-title-menu { width: min(920px, 100%); }
+  .pg-title-dock {
+    grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: 'cards cards cards' 'info round play'; gap: 12px 16px; align-items: center;
+    padding: 12px 14px 14px; background: var(--paper); border: 4px solid var(--ink); border-radius: 22px; box-shadow: 0 6px 0 var(--ink);
+  }
+  /* Course tabs: flat segments inside the bar; the selected one takes the course colour. */
+  .pg-course-options { gap: 8px; padding-top: 0; }
+  .pg-root .pg-course-card {
+    display: grid; grid-template-columns: auto 1fr; grid-template-rows: 1fr 1fr; column-gap: 10px; align-items: center;
+    padding: 6px 10px 6px 6px; text-align: left; background: var(--paper-2); border: 3px solid transparent; border-radius: 14px; box-shadow: none;
+  }
+  .pg-card-icon { grid-row: 1 / 3; width: 46px; max-width: 46px; margin: 0; }
+  .pg-card-name { align-self: end; font-size: 15px; }
+  .pg-card-tag { align-self: start; font-size: 12px; }
+  .pg-root .pg-course-card.is-selected { background: var(--card); border-color: var(--ink); transform: none; box-shadow: 0 3px 0 var(--ink); }
+  .pg-course-card.is-selected::before, .pg-course-card.is-selected::after { display: none; }
+  @media (hover: hover) {
+    .pg-root .pg-course-card:hover:not(.is-selected) { transform: none; box-shadow: none; background: color-mix(in srgb, var(--card) 30%, var(--paper-2)); }
+    .pg-root .pg-course-card.is-selected:hover { transform: none; }
+  }
+  .pg-title-info { padding: 0 0 0 4px; }
+  .pg-title-course h3 { font-size: 21px; }
+  .pg-title-course small { display: none; }
+  .pg-title-course p { margin-top: 2px; font-size: 14px; white-space: nowrap; }
+  .pg-root .pg-round-options { padding: 3px; box-shadow: none; }
+  .pg-root .pg-round-options button { min-height: 34px; padding: 0 14px; }
+  .pg-play-group { flex-direction: row; align-items: stretch; gap: 10px; }
+  .pg-root .pg-play-group .pg-title-play { min-width: 140px; min-height: 50px; padding: 0 20px; font-size: 30px; border-width: 3px; border-radius: 16px; box-shadow: 0 4px 0 var(--ink); }
+  .pg-root .pg-play-group .pg-title-run { min-width: 0; font-size: 22px; padding: 0 16px; }
+  .pg-title-future { margin-top: 10px; }
+  .pg-title-menu .pg-board { margin-top: 0; }
 }

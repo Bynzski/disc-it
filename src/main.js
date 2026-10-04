@@ -80,7 +80,7 @@ const state = {
   showLanding: true,
   holeIndex: 0,
   scores: holes.map(() => null),
-  discType: 'midrange',
+  discType: null,
   lie: holes[0].tee.clone(),
   position: holes[0].tee.clone(),
   velocity: new THREE.Vector3(),
@@ -262,8 +262,16 @@ function resetTouchTilt() {
   state.releaseAngle = 0;
 }
 
+// A disc must be picked (1/2/3 or the bag) before a throw can be charged.
+function requireDisc() {
+  if (state.discType) return true;
+  hud.toast('Pick a disc first (1 · 2 · 3)');
+  return false;
+}
+
 function startTouchThrow() {
   if (state.showLanding || state.mode !== 'aiming' || state.finished || state.charging) return;
+  if (!requireDisc()) return;
   state.charging = true;
   state.chargeStart = performance.now();
   state.power = 0;
@@ -335,7 +343,7 @@ function chargePower(now) {
 }
 
 function throwDisc() {
-  if (state.mode !== 'aiming' || state.finished) return;
+  if (state.mode !== 'aiming' || state.finished || !state.discType) return;
   state.showLanding = false;
   const power = clamp(state.power, 0.08, 1);
   const dir = aimDirection();
@@ -393,12 +401,10 @@ function startRound(format = 'all', mode = MODES.FREE) {
 
 function startHole(index) {
   preview.skip();
-  if (isMouseCaptured()) document.exitPointerLock?.();
   state.showLanding = false;
   state.holeIndex = index;
   state.mode = 'aiming';
-  state.discType = 'midrange';
-  disc.select(state.discType);
+  state.discType = null;
   state.lie.copy(hole().tee);
   state.position.copy(hole().tee);
   state.velocity.set(0, 0, 0);
@@ -455,13 +461,14 @@ function finishHole() {
   state.position.set(hole().basket.x, hole().basket.y + 1.15, hole().basket.z);
   state.charging = false;
   state.power = 0;
-  // Free the cursor so dialogs (Next hole / Restart) are clickable.
-  if (isMouseCaptured()) document.exitPointerLock?.();
   disc.resetTrail();
   state.spinRate = 0;
   state.bank = 0;
   state.scores[state.holeIndex] = state.runMode ? recordedThrows(state.throws) : state.throws;
   const last = state.holeIndex + 1 >= roundHoles.length;
+  // Keep the pointer locked between holes (N / the next-hole key advances); only the
+  // final scorecard needs a free cursor for its buttons and name prompt.
+  if (last && isMouseCaptured()) document.exitPointerLock?.();
   if (last && state.runMode) completeRun();
   hud.toast(last ? 'Round complete!' : 'Chains! Hole complete.');
 }
@@ -842,6 +849,7 @@ window.addEventListener('mousedown', (e) => {
     requestMouseCapture();
     return;
   }
+  if (!requireDisc()) return;
   state.charging = true;
   state.chargeStart = performance.now();
   state.power = 0;

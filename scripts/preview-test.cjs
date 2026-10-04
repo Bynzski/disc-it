@@ -63,7 +63,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/home/jay/.npm/_npx
   // Current replay, next hole, new round; no preview after an ordinary throw.
   await page.keyboard.press('r');assert.equal(await page.evaluate(()=>t.preview.active),true);
   await page.keyboard.press('Space');
-  await page.mouse.click(650,300);await page.waitForFunction(()=>t.state.mouseCaptured);
+  await page.mouse.click(650,300);await page.waitForFunction(()=>t.state.mouseCaptured);await page.keyboard.press('2');
   await page.mouse.down();await page.waitForTimeout(100);await page.mouse.up();
   assert.equal(await page.evaluate(()=>t.state.throws),1);assert.equal(await page.evaluate(()=>t.preview.active),false);
   await page.evaluate(()=>{t.finishHole();t.nextHole();});assert.equal(await page.evaluate(()=>t.preview.active),true);

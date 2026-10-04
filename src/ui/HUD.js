@@ -70,8 +70,12 @@ export class HUD {
         <div class="pg-aim-label"><b id="pg-cross-angle">0° Flat</b><span class="pg-hint-desktop">Scroll to tilt</span><span class="pg-hint-touch">Use tilt buttons</span></div>
       </div>
 
-      <section class="pg-panel pg-chunk" aria-label="Shot setup">
-        <div class="pg-panel-heading"><span class="pg-panel-title">Disc bag</span><span id="pg-disc-ratings" title="Speed / glide / turn / fade"></span></div>
+      <section class="pg-panel" aria-label="Shot setup">
+        <div class="pg-charge" id="pg-charge" aria-hidden="true">
+          <div class="pg-shot-row"><span class="pg-status" id="pg-status" data-state="ready">Ready</span><span id="pg-power-value">Power 0%</span></div>
+          <div class="pg-power" role="progressbar" aria-label="Throw power" aria-valuemin="0" aria-valuemax="100"><div id="pg-power-fill"></div></div>
+        </div>
+        <div class="pg-panel-heading"><span class="pg-chip">Elevation <b id="pg-elevation">0°</b></span><span id="pg-disc-ratings" title="Speed / glide / turn / fade"></span></div>
         <div class="pg-disc-selector" role="group" aria-label="Choose disc">
           ${Object.entries(DISCS).map(([type, disc], index) => `
             <button type="button" data-disc="${type}" aria-keyshortcuts="${index + 1}" aria-pressed="false" title="${disc.description}" style="--disc-color:${disc.color}">
@@ -79,9 +83,7 @@ export class HUD {
             </button>
           `).join('')}
         </div>
-        <div class="pg-shot-row"><span class="pg-chip">Elevation <b id="pg-elevation">0°</b></span><span id="pg-power-value">Power 0%</span></div>
-        <div class="pg-power" role="progressbar" aria-label="Throw power" aria-valuemin="0" aria-valuemax="100"><div id="pg-power-fill"></div></div>
-        <div class="pg-shot-footer"><span><kbd>LMB</kbd> <span id="pg-throw-label">Hold / release</span></span><span class="pg-status" id="pg-status" data-state="ready">Ready</span></div>
+        <span hidden><kbd>LMB</kbd> <span id="pg-throw-label"></span></span>
       </section>
 
       <nav class="pg-actions" aria-label="Game actions">
@@ -132,7 +134,7 @@ export class HUD {
             </div>
             <div class="pg-play-group">
               <button type="button" id="pg-start-round" class="pg-title-play" aria-keyshortcuts="Enter Space" aria-label="Play course: Tocobaga Park"><svg aria-hidden="true" viewBox="0 0 24 24" width="26" height="26"><path d="M7 3.5 20 12 7 20.5Z" fill="currentColor" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg><span>Play</span></button>
-              <button type="button" id="pg-mode-toggle" class="pg-mode-chip" aria-pressed="false" title="Every throw counts: no restarts. Finish the round to post your score to the leaderboard.">Leaderboard run</button>
+              <button type="button" id="pg-start-run" class="pg-title-play pg-title-run" aria-label="Play a leaderboard run" title="Every throw counts: no restarts. Finish the round to post your score to the leaderboard."><svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3M12 14v4M8 20h8"/></svg><span>Leaderboard</span></button>
             </div>
           </div>
           <aside class="pg-board" aria-label="Leaderboard">
@@ -184,9 +186,9 @@ export class HUD {
     const get = id => this.root.querySelector(`#pg-${id}`);
     this.el = Object.fromEntries([
       'course-name', 'hole-number', 'hole-name', 'hole-meta', 'throws', 'distance', 'crosshair', 'cross-angle',
-      'tilt-disc', 'disc-ratings', 'elevation', 'power-value', 'power-fill', 'throw-label',
+      'tilt-disc', 'charge', 'disc-ratings', 'elevation', 'power-value', 'power-fill', 'throw-label',
       'status', 'view-toggle', 'view-label', 'restart', 'cursor', 'capture-hint',
-      'touch-throw', 'touch-power', 'touch-flat', 'toast', 'landing', 'start-round', 'round-summary', 'selected-course', 'course-description', 'final', 'final-eyebrow', 'final-result', 'final-score', 'final-restart', 'next', 'scorecard', 'score-total', 'final-title', 'final-card', 'quit', 'mode-toggle', 'board-title', 'board-list', 'board-note', 'run-panel', 'run-form', 'run-name-input', 'run-status', 'run-retry',
+      'touch-throw', 'touch-power', 'touch-flat', 'toast', 'landing', 'start-round', 'start-run', 'round-summary', 'selected-course', 'course-description', 'final', 'final-eyebrow', 'final-result', 'final-score', 'final-restart', 'next', 'scorecard', 'score-total', 'final-title', 'final-card', 'quit', 'board-title', 'board-list', 'board-note', 'run-panel', 'run-form', 'run-name-input', 'run-status', 'run-retry',
     ].map(id => [id, get(id)]));
     this.scoreCells = [...this.root.querySelectorAll('.pg-score-cell')];
     this.powerBar = this.root.querySelector('.pg-power');
@@ -240,13 +242,8 @@ export class HUD {
       selectRound(this.roundFormat);
     });
     for (const button of this.roundButtons) button.addEventListener('click', () => selectRound(button.dataset.roundFormat));
-    this.el['mode-toggle'].addEventListener('click', () => {
-      this.runMode = this.runMode === 'run' ? 'free' : 'run';
-      const on = this.runMode === 'run';
-      this.el['mode-toggle'].setAttribute('aria-pressed', String(on));
-      this.el['mode-toggle'].classList.toggle('is-selected', on);
-    });
-    this.el['start-round'].addEventListener('click', () => onStartRound?.(this.roundFormat, this.runMode));
+    this.el['start-round'].addEventListener('click', () => onStartRound?.(this.roundFormat, 'free'));
+    this.el['start-run'].addEventListener('click', () => onStartRound?.(this.roundFormat, 'run'));
 
     const setTouchPressed = (button, pressed, event) => {
       event?.preventDefault();
@@ -304,7 +301,7 @@ export class HUD {
       this.root.querySelector('.pg-score-scroll').setAttribute('aria-label', `${data.holes.length}-hole scorecard; scroll horizontally for all holes`);
       this.el['score-total'] = this.el.scorecard.querySelector('#pg-score-total');
     }
-    const profile = DISCS[data.discType];
+    const profile = DISCS[data.discType] ?? { color: '#73b8c5', ratings: '' };
     const hole = data.hole;
     const isLanding = data.showLanding;
     this.root.classList.toggle('is-landing', isLanding);
@@ -333,6 +330,7 @@ export class HUD {
     // Chunky meter: the fill advances in 5% blocks (20 segments) and the CSS ramps its colour.
     this.powerBar.style.setProperty('--p', `${Math.ceil(power / 5) * 5}%`);
     this.powerBar.classList.toggle('is-max', power >= 90);
+    this.el.charge.classList.toggle('is-active', !!data.charging);
     this.powerBar.setAttribute('aria-valuenow', power);
     this.el['power-value'].textContent = power >= 95 ? 'MAX POWER!' : `Power ${power}%`;
     this.el['touch-power'].textContent = `${power}%`;

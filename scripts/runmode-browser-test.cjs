@@ -19,8 +19,8 @@ async function openGame(browser, board) {
 }
 
 // The hole flyover preview swallows all keys and clicks until it ends; skip it before playing.
-async function startPlaying(page) {
-  await page.click('#pg-start-round');
+async function startPlaying(page, start = '#pg-start-round') {
+  await page.click(start);
   await page.waitForFunction(() => window.__discState && window.__discState.showLanding === false);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => window.__discState.mode === 'aiming');
@@ -52,8 +52,7 @@ async function startPlaying(page) {
     // 3. Free play restarts; leaderboard run does not.
     for (const mode of ['free', 'run']) {
       const { page } = await openGame(browser, []);
-      if (mode === 'run') await page.click('#pg-mode-toggle');
-      await startPlaying(page);
+      await startPlaying(page, mode === 'run' ? '#pg-start-run' : '#pg-start-round');
       // The action nav is visibility:hidden during the hole flyover, so check the hidden attribute, not visibility.
       assert.equal(await page.locator('#pg-restart').evaluate(e => e.hidden), mode === 'run');
       assert.equal(await page.locator('#pg-quit').evaluate(e => e.hidden), mode === 'free');
@@ -67,8 +66,7 @@ async function startPlaying(page) {
     // 4. Name box swallows shortcuts instead of replaying / skipping.
     {
       const { page } = await openGame(browser, []);
-      await page.click('#pg-mode-toggle');
-      await startPlaying(page);
+      await startPlaying(page, '#pg-start-run');
       await page.evaluate(() => {
         const s = window.__discState;
         s.scores = s.scores.map(() => 3);
@@ -93,8 +91,7 @@ async function startPlaying(page) {
         await new Promise(r => setTimeout(r, 600));
         await route.fulfill({ status: 201, json: { id: 1, rank: 1 } });
       });
-      await page.click('#pg-mode-toggle');
-      await startPlaying(page);
+      await startPlaying(page, '#pg-start-run');
       await page.evaluate(() => {
         const s = window.__discState;
         s.scores = s.scores.map(() => 3);
