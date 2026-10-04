@@ -83,7 +83,7 @@ export class HolePreviewController {
     ahead.y = Math.max(1.35, ahead.y - 2.2);
     const pinBlend = smooth(THREE.MathUtils.clamp((travel - .72) / .28, 0, 1));
     const target = ahead.lerp(this.pin, pinBlend);
-    const focus = PREVIEW_FOCUS[this.hole.id];
+    const focus = this.hole.previewFocus ?? (this.hole.previewPath ? undefined : PREVIEW_FOCUS[this.hole.id]);
     if (focus && travel > focus.start && travel < focus.end) {
       const phase = (travel - focus.start) / (focus.end - focus.start);
       const weight = Math.sin(phase * Math.PI) ** 2 * focus.weight;

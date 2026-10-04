@@ -19,9 +19,9 @@ export function makeBasket(scene, position) {
     const ring = new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 8, 28), metal);
     ring.rotation.x = Math.PI / 2; ring.position.y = y; group.add(ring);
   }
-  function line(a, b) {
-    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...a), new THREE.Vector3(...b)]), chains));
-  }
+  // All chain segments share one LineSegments object: one draw call per basket.
+  const points = [];
+  function line(a, b) { points.push(new THREE.Vector3(...a), new THREE.Vector3(...b)); }
   for (let i = 0; i < 16; i++) {
     const a = i / 16 * Math.PI * 2;
     line([Math.cos(a)*.62, 2.2, Math.sin(a)*.62], [Math.cos(a+.12)*.24, 1.15, Math.sin(a+.12)*.24]);
@@ -30,5 +30,6 @@ export function makeBasket(scene, position) {
     const a = i / 14 * Math.PI * 2;
     line([Math.cos(a)*.2, .82, Math.sin(a)*.2], [Math.cos(a)*.82, .98, Math.sin(a)*.82]);
   }
+  group.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(points), chains));
   return group;
 }

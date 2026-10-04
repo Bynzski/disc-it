@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 import { makeBasket } from './Basket.js';
-import { createParkSign, placeAsset } from './ParkAssets.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { createBin, createParkSign } from './ParkAssets.js';
 import { createBench } from './EnvironmentAssets.js';
+import { createAgave, createCairn, createDesertPicnicTable, createFenceBay, createGrassTuft, createJuniper, createMesa, createOrientationBoard, createPricklyPear, createRabbitbrush, createSagebrush, createThunderbirdMarker, createTrailBench, createTrailMarker, createTrailheadShelter, createWaterRefill, createYucca } from './ThunderbirdAssets.js';
+import { addThunderbirdScenery, bakeThunderbird, buildSkirt, makeGroundColor } from './ThunderbirdScenery.js';
 
 export const THUNDERBIRD_BOUNDS={minX:-210,maxX:210,minZ:-215,maxZ:215};
 const peaks=[[-175,-155,38,31],[-157,-126,24,18],[-145,-90,18,65],[25,-145,24,72],[145,-65,30,62],[120,95,38,70],[-10,145,34,68],[-145,95,25,58],[5,15,-13,58]];
@@ -36,30 +39,117 @@ function previewFor(route) {
  return points;
 }
 export const THUNDERBIRD_HOLES=raw.map(([id,name,par,route,note])=>({id,name,par,route,width:id>9?10:12,lengthFeet:Math.round(route.slice(1).reduce((s,b,i)=>s+Math.hypot(b[0]-route[i][0],b[1]-route[i][1]),0)*3.05),note,previewPath:previewFor(route)}));
+function segmentDistance(x,z,a,b){const dx=b[0]-a[0],dz=b[1]-a[1],t=Math.max(0,Math.min(1,((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz||1)));return Math.hypot(x-a[0]-t*dx,z-a[1]-t*dz)}
+export function thunderbirdSurfaceHeight(x,z){
+ const terrain=thunderbirdHeight(x,z);
+ const onFairway=THUNDERBIRD_HOLES.some(h=>h.route.slice(1).some((b,i)=>segmentDistance(x,z,h.route[i],b)<=h.width*.5));
+ let surface=terrain+(onFairway ? .08 : 0);
+ // Basket shelves are broad, shallow sandstone ellipsoids. Their upper surface
+ // participates in ground contact so a disc can settle instead of passing through.
+ for(const h of THUNDERBIRD_HOLES){const [bx,bz]=h.route.at(-1),dx=(x-bx)/7,dz=(z-bz)/6,q=1-dx*dx-dz*dz;if(q>0){const center=thunderbirdHeight(bx,bz)-1.25;surface=Math.max(surface,center+1.35*Math.sqrt(q))}}
+ return surface;
+}
 const mat=c=>new THREE.MeshStandardMaterial({color:c,roughness:1,flatShading:true});
-const redRock=mat(0x873e2c), darkRock=mat(0x6f3328), juniper=mat(0x405540), trunk=mat(0x5c3928);
-const rockGeo=new THREE.IcosahedronGeometry(1,1),juniperGeo=new THREE.IcosahedronGeometry(1,0);
-function addRedRock(scene,colliders,x,z,size=[2.5,1.8,2.2],layered=false){const y=thunderbirdHeight(x,z);if(layered){for(let i=0;i<3;i++){const m=new THREE.Mesh(rockGeo,i%2?darkRock:redRock);m.scale.set(size[0]*(1-i*.12),size[1]*.38,size[2]*(1-i*.1));m.position.set(x,y+i*size[1]*.55,z);m.castShadow=m.receiveShadow=true;scene.add(m)}}else{const m=new THREE.Mesh(rockGeo,redRock);m.scale.set(...size);m.position.set(x,y+size[1]*.65,z);m.castShadow=m.receiveShadow=true;scene.add(m)}colliders.push({kind:'rock',center:new THREE.Vector3(x,y+size[1]*.65,z),radii:new THREE.Vector3(...size)})}
-function addJuniper(scene,x,z,s=1){const y=thunderbirdHeight(x,z),t=new THREE.Mesh(new THREE.CylinderGeometry(.3,.5,2.5,6),trunk),c=new THREE.Mesh(juniperGeo,juniper);t.position.set(x,y+1.25,z);c.position.set(x,y+3,z);c.scale.set(2.2*s,1.7*s,2.2*s);t.castShadow=c.castShadow=true;scene.add(t,c)}
-function terrainRibbon(scene,A,B,width,material){
+const redRock=mat(0x873e2c), darkRock=mat(0x6f3328);
+const rockGeo=new THREE.IcosahedronGeometry(1,1);
+const PLANE={hx:215,hz:220};
+const rockMesh=(material,position,scale,rotationY=0)=>{const m=new THREE.Mesh(rockGeo,material);m.position.set(...position);m.scale.set(...scale);m.rotation.y=rotationY;return m};
+// Rocks, junipers and plants are collected as prefab groups and baked into a
+// handful of instanced batches afterwards (see bakeThunderbird).
+function addRedRock(bag,colliders,x,z,size=[2.5,1.8,2.2],layered=false){const y=thunderbirdHeight(x,z),g=new THREE.Group();g.name='Red rock outcrop';if(layered){for(let i=0;i<3;i++)g.add(rockMesh(i%2?darkRock:redRock,[x,y+i*size[1]*.55,z],[size[0]*(1-i*.12),size[1]*.38,size[2]*(1-i*.1)]))}else g.add(rockMesh(redRock,[x,y+size[1]*.65,z],size));bag.push(g);colliders.push({kind:'rock',center:new THREE.Vector3(x,y+size[1]*.65,z),radii:new THREE.Vector3(...size)})}
+function addDesertPlant(bag,type,x,z,s=1,seed=1){
+ const make={sage:createSagebrush,rabbitbrush:createRabbitbrush,cactus:createPricklyPear,grass:seed=>createGrassTuft(seed,seed%3)}[type];
+ const asset=make(seed);asset.position.set(x,thunderbirdHeight(x,z)-.04,z);asset.rotation.y=seed*1.7;asset.scale.setScalar(s*(type==='grass'?1.1:1));bag.push(asset);return asset;
+}
+function addJuniper(bag,x,z,s=1,seed=1){const asset=createJuniper(seed);asset.position.set(x,thunderbirdHeight(x,z)-.04,z);asset.rotation.y=seed*2.3;asset.scale.setScalar(s);bag.push(asset);return asset}
+function clearOfPlay(x,z,radius=2){return THUNDERBIRD_HOLES.every(h=>Math.hypot(x-h.route[0][0],z-h.route[0][1])>radius+7&&Math.hypot(x-h.route.at(-1)[0],z-h.route.at(-1)[1])>radius+8&&h.route.slice(1).every((b,i)=>segmentDistance(x,z,h.route[i],b)>h.width*.5+radius+2))}
+function withinThunderbirdBounds(x,z,radius){return x-radius>=THUNDERBIRD_BOUNDS.minX&&x+radius<=THUNDERBIRD_BOUNDS.maxX&&z-radius>=THUNDERBIRD_BOUNDS.minZ&&z+radius<=THUNDERBIRD_BOUNDS.maxZ}
+function placeDesertProp(bag,asset,x,z,rotation=0,scale=1){asset.position.set(x,thunderbirdHeight(x,z),z);asset.rotation.y=rotation;asset.scale.setScalar(scale);bag.push(asset);return asset}
+function addDesertProps(bag,existingPlacements){
+ const placements=[],occupied=existingPlacements.map(p=>({x:p.x,z:p.z,radius:1.2}));
+ const add=(zone,type,asset,x,z,rotation=0,scale=1,radius=1.2)=>{
+  if(!withinThunderbirdBounds(x,z,radius)||!clearOfPlay(x,z,radius)||occupied.some(p=>Math.hypot(x-p.x,z-p.z)<radius+p.radius))return;
+  placeDesertProp(bag,asset,x,z,rotation,scale);occupied.push({x,z,radius});placements.push({zone,type,name:asset.name,x,z,radius});
+ };
+ add('Trailhead Commons','shelter',createTrailheadShelter(),-198,-195,.08,1,5.2);
+ add('Trailhead Commons','picnic-table',createDesertPicnicTable(),-188,-188,-.45,1,2.3);
+ add('Trailhead Commons','bench',createTrailBench(),-203,-187,1.5,1,1.5);
+ add('Trailhead Commons','water-refill',createWaterRefill(),-207,-205,0,1,1.1);
+ add('Trailhead Commons','orientation-board',createOrientationBoard(),-191,-202,0,1,1.8);
+ add('Trailhead Commons','thunderbird-marker',createThunderbirdMarker(),-204,-204,0,.9,.8);
+ add('Trailhead Commons','yucca',createYucca(),-205,-192,0,.8,.8);
+ add('Copper Wash','bench',createTrailBench(),131,94,-.4,1,1.5);
+ add('Copper Wash','water-refill',createWaterRefill(),126,96,.15,1,1.1);
+ add('Copper Wash','trail-marker',createTrailMarker(),126,88,0,.9,.9);
+ add('Cedar Bend','bench',createTrailBench(),-55,111,-.55,1,1.5);
+ add('Cedar Bend','orientation-board',createOrientationBoard(),-61,116,.2,1,1.8);
+ add('Cedar Bend','agave',createAgave(),-45,115,0,.9,.9);
+ add('Sunset Saddle','bench',createTrailBench(),-130,51,-.8,1,1.5);
+ add('Sunset Saddle','bin',createBin(),-136,57,0,1,.8);
+ add('Sunset Saddle','cairn',createCairn(),-138,44,0,1,1.1);
+ add('Mesa Launch','bench',createTrailBench(),-103,141,-.35,1,1.5);
+ add('Mesa Launch','trail-marker',createTrailMarker(),-88,147,0,.9,.9);
+ add('Mesa Launch','cairn',createCairn(),-110,148,0,1,1.1);
+ add('Thunder Gulch','bench',createTrailBench(),98,125,-.5,1,1.5);
+ add('Thunder Gulch','orientation-board',createOrientationBoard(),104,132,.15,1,1.8);
+ add('High Traverse','bench',createTrailBench(),116,-108,.55,1,1.5);
+ add('High Traverse','yucca',createYucca(),121,-115,0,.8,.8);
+ add('Rim Choice','bench',createTrailBench(),-183,-188,-.45,1,1.5);
+ add('Rim Choice','cairn',createCairn(),-177,-194,0,1,1.1);
+ add('Eastern Overlook','bench',createTrailBench(),190,95,-.5,1,1.5);
+ add('Eastern Overlook','trail-marker',createTrailMarker(),183,88,0,.9,.9);
+ add('Eastern Overlook','cairn',createCairn(),196,104,0,1,1.1);
+ return placements;
+}
+function addDesertDressing(bag){
+ const zones=[
+  {name:'Trailhead sage',type:'sage',points:[[-188,-143],[-184,-132],[-158,-151],[-145,-143]]},
+  {name:'Copper wash rabbitbrush',type:'rabbitbrush',points:[[113,69],[103,63],[87,70],[73,64]]},
+  {name:'Sunset saddle grass',type:'grass',points:[[-122,38],[-131,45],[-141,34],[-126,20]]},
+  {name:'Mesa pinyon ridge',type:'juniper',points:[[-84,128],[-55,151],[-33,119],[8,132]]},
+  {name:'Eastern shelf cactus',type:'cactus',points:[[164,83],[172,65],[159,48],[151,18]]},
+  {name:'Southern gully grass',type:'grass',points:[[82,-102],[55,-126],[20,-133],[-55,-137]]},
+  {name:'Rim sage',type:'sage',points:[[-125,-174],[-150,-184],[-184,-176],[-182,-142]]},
+ ];
+ const placements=[];let seed=1;for(const zone of zones)for(const [x,z]of zone.points)if(clearOfPlay(x,z,zone.type==='juniper'?2.4:1.2)){
+  const radius=zone.type==='juniper'?2.4:1.2;
+  if(zone.type==='juniper')addJuniper(bag,x,z,.75,seed++);else addDesertPlant(bag,zone.type,x,z,.9,seed++);
+  placements.push({zone:zone.name,type:zone.type,x,z,radius});
+  // Low plants occur in small natural colonies; trees remain solitary silhouettes.
+  if(zone.type!=='juniper'&&clearOfPlay(x+2.4,z-1.8,.8)){addDesertPlant(bag,zone.type,x+2.4,z-1.8,.62,seed++);placements.push({zone:zone.name,type:zone.type,x:x+2.4,z:z-1.8,radius:.8})}
+}
+ // Minimal trail furniture: early rest stops and a short trailhead rail only.
+ for(const [x,z,a]of [[-164.4,-158.5,.8],[14.5,-37.2,1.1],[-107,63.8,.5]])if(clearOfPlay(x,z,2)){const bench=createBench();bench.position.set(x,thunderbirdHeight(x,z),z);bench.rotation.y=a;bag.push(bench);placements.push({zone:'Trail rest',type:'bench',x,z,radius:2})}
+ for(let i=0;i<4;i++){const x=-202+i*5,z=-145;if(!clearOfPlay(x,z,1))continue;const bay=createFenceBay(i<3?5:.05,i<3?thunderbirdHeight(x+5,z)-thunderbirdHeight(x,z):0,0);bay.position.set(x,thunderbirdHeight(x,z),z);bag.push(bay);placements.push({zone:'Trailhead rail',type:'fence',x,z,radius:1})}
+  placements.push(...addDesertProps(bag,placements));
+  return placements;
+}
+// Fairway ribbons share one material, so their geometry is merged into one draw call.
+function ribbonGeometry(A,B,width){
  const dx=B[0]-A[0],dz=B[1]-A[1],length=Math.hypot(dx,dz),nx=-dz/length,nz=dx/length;
  const steps=Math.max(4,Math.ceil(length/4)),vertices=[],uvs=[],indices=[];
- for(let i=0;i<=steps;i++){const t=i/steps,cx=THREE.MathUtils.lerp(A[0],B[0],t),cz=THREE.MathUtils.lerp(A[1],B[1],t);for(const side of [-1,1]){const x=cx+nx*width*.5*side,z=cz+nz*width*.5*side;vertices.push(x,thunderbirdHeight(x,z)+.16,z);uvs.push(side<0?0:1,t)}}
+ for(let i=0;i<=steps;i++){const t=i/steps,cx=THREE.MathUtils.lerp(A[0],B[0],t),cz=THREE.MathUtils.lerp(A[1],B[1],t);for(const side of [-1,1]){const x=cx+nx*width*.5*side,z=cz+nz*width*.5*side;vertices.push(x,thunderbirdHeight(x,z)+.12,z);uvs.push(side<0?0:1,t)}}
  for(let i=0;i<steps;i++){const a=i*2,b=a+1,c=a+2,d=a+3;indices.push(a,b,c,b,d,c)}
  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geometry.setIndex(indices);geometry.computeVertexNormals();
- const mesh=new THREE.Mesh(geometry,material);mesh.receiveShadow=true;scene.add(mesh);return mesh;
+ return geometry;
 }
 export function buildThunderbirdCourse(scene){
- const colliders=[],baskets=[],holes=THUNDERBIRD_HOLES.map(d=>({...d,tee:new THREE.Vector3(d.route[0][0],thunderbirdHeight(...d.route[0])+.08,d.route[0][1]),basket:new THREE.Vector3(d.route.at(-1)[0],thunderbirdHeight(...d.route.at(-1)),d.route.at(-1)[1]),aimPoint:new THREE.Vector3(d.route[1][0],thunderbirdHeight(...d.route[1]),d.route[1][1])}));
- const g=new THREE.PlaneGeometry(430,440,120,120);g.rotateX(-Math.PI/2);const a=g.attributes.position;for(let i=0;i<a.count;i++)a.setY(i,thunderbirdHeight(a.getX(i),a.getZ(i)));g.computeVertexNormals();const ground=new THREE.Mesh(g,mat(0xa65332));ground.receiveShadow=true;scene.add(ground);
- const dirt=mat(0xc16b3f),rock=redRock;
- // Low-poly mesas sit beyond the playable rim and establish the Cedar City skyline.
- for(const [x,z,s]of [[-185,185,1.2],[-80,205,.9],[55,202,1.1],[180,170,1.35]]){const mesa=new THREE.Mesh(new THREE.CylinderGeometry(24*s,34*s,18*s,7),darkRock);mesa.position.set(x,thunderbirdHeight(x,z)+7*s,z);mesa.receiveShadow=true;scene.add(mesa)}
- for(const h of holes){for(let i=1;i<h.route.length;i++)terrainRibbon(scene,h.route[i-1],h.route[i],h.width,dirt);
-  const p=h.basket;const shelf=new THREE.Mesh(rockGeo,rock);shelf.scale.set(7,1.35,6);shelf.rotation.y=h.id*.73;shelf.position.set(p.x,p.y-.8,p.z);shelf.castShadow=shelf.receiveShadow=true;scene.add(shelf);baskets.push(makeBasket(scene,p));
-  if([1,4].includes(h.id)){const bench=createBench();placeAsset(scene,bench,h.tee.x-7,h.tee.z-4,.4);bench.position.y=thunderbirdHeight(bench.position.x,bench.position.z)}
-  const A=h.route[0],B=h.route[1],ang=Math.atan2(B[0]-A[0],B[1]-A[1]);const sign=createParkSign(`${h.id}  ${h.name}`,`PAR ${h.par} / ${h.lengthFeet} FT`);placeAsset(scene,sign,A[0]+Math.cos(ang)*5,A[1]-Math.sin(ang)*5,ang+Math.PI);sign.position.y=thunderbirdHeight(sign.position.x,sign.position.z);
-  for(let k=0;k<(h.id>9?5:3);k++){const t=(k+1)/(h.id>9?6:4),x=THREE.MathUtils.lerp(A[0],B[0],t)+(k%2?1:-1)*(h.width+5),z=THREE.MathUtils.lerp(A[1],B[1],t)+(k%2?-1:1)*4;addRedRock(scene,colliders,x,z,[2.5+k%2,1.8,2.2],k%3===0);if(k===1)addJuniper(scene,x+(k%2?6:-6),z+5,.8);}
+ const colliders=[],baskets=[],holes=THUNDERBIRD_HOLES.map(d=>({...d,tee:new THREE.Vector3(d.route[0][0],thunderbirdSurfaceHeight(...d.route[0])+.08,d.route[0][1]),basket:new THREE.Vector3(d.route.at(-1)[0],thunderbirdSurfaceHeight(...d.route.at(-1)),d.route.at(-1)[1]),aimPoint:new THREE.Vector3(d.route[1][0],thunderbirdHeight(...d.route[1]),d.route[1][1])}));
+ const colorAt=makeGroundColor(thunderbirdHeight);
+ const g=new THREE.PlaneGeometry(PLANE.hx*2,PLANE.hz*2,140,140);g.rotateX(-Math.PI/2);const a=g.attributes.position,col=new Float32Array(a.count*3),c=new THREE.Color();for(let i=0;i<a.count;i++){const x=a.getX(i),z=a.getZ(i);a.setY(i,thunderbirdHeight(x,z));colorAt(x,z,c);col.set([c.r,c.g,c.b],i*3)}g.setAttribute('color',new THREE.BufferAttribute(col,3));g.computeVertexNormals();
+ const ground=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:1,flatShading:true}));ground.name='Thunderbird ground';ground.receiveShadow=true;scene.add(ground);scene.add(buildSkirt(thunderbirdHeight,colorAt,PLANE));
+ const dirt=new THREE.MeshStandardMaterial({color:0xc16b3f,roughness:1,flatShading:true,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4}),bag=[],rockBag=[],nearMesas=[],ribbons=[];
+ // Low-poly mesas just inside the rim frame the playable bowl (distant buttes are added with the scenery).
+ for(const [x,z,s,seed]of [[-185,185,1.2,1],[-80,205,.9,2],[55,202,1.1,3],[180,170,1.35,4]]){const mesa=createMesa(40+seed,24*s,19*s);mesa.position.set(x,thunderbirdHeight(x,z)-2,z);nearMesas.push(mesa)}
+ const dressing=addDesertDressing(bag);
+ for(const h of holes){for(let i=1;i<h.route.length;i++)ribbons.push(ribbonGeometry(h.route[i-1],h.route[i],h.width));
+  const p=h.basket;const shelf=rockMesh(redRock,[p.x,p.y-1.35,p.z],[7,1.35,6],h.id*.73);const shelfGroup=new THREE.Group();shelfGroup.add(shelf);rockBag.push(shelfGroup);colliders.push({kind:'rock',role:'basket-shelf',center:shelf.position.clone(),radii:shelf.scale.clone()});baskets.push(makeBasket(scene,p));
+  const A=h.route[0],B=h.route[1],ang=Math.atan2(B[0]-A[0],B[1]-A[1]);const sign=createParkSign(`${h.id}  ${h.name}`,`PAR ${h.par} / ${h.lengthFeet} FT`);sign.position.set(A[0]+Math.cos(ang)*5,thunderbirdHeight(A[0]+Math.cos(ang)*5,A[1]-Math.sin(ang)*5),A[1]-Math.sin(ang)*5);sign.rotation.y=ang+Math.PI;bag.push(sign);
+  for(let k=0;k<(h.id>9?5:3);k++){const t=(k+1)/(h.id>9?6:4),x=THREE.MathUtils.lerp(A[0],B[0],t)+(k%2?1:-1)*(h.width+5),z=THREE.MathUtils.lerp(A[1],B[1],t)+(k%2?-1:1)*4;addRedRock(rockBag,colliders,x,z,[2.5+k%2,1.8,2.2],k%3===0);if(k===1)addJuniper(bag,x+(k%2?6:-6),z+5,.8,h.id*5+k);}
  }
- return{holes,colliders,baskets,water:[],bounds:THUNDERBIRD_BOUNDS,groundHeight:thunderbirdHeight,groundNormal:normalAt,palette:{sky:0xd69b72,fog:0xd69b72},name:'Thunderbird Gardens'};
+ const ribbon=new THREE.Mesh(mergeGeometries(ribbons),dirt);ribbon.name='Thunderbird fairway ribbons';ribbon.receiveShadow=true;scene.add(ribbon);
+ const earlyBatches=[...bakeThunderbird(scene,[...bag,...rockBag],'Thunderbird dressing'),...bakeThunderbird(scene,nearMesas,'Thunderbird rim mesas',{cast:false})];
+ const existing=[...dressing,...nearMesas.map(m=>({x:m.position.x,z:m.position.z,radius:32}))];
+ const scenery=addThunderbirdScenery({scene,heightAt:thunderbirdHeight,bounds:THUNDERBIRD_BOUNDS,holes,colliders,existing,plane:PLANE,colorAt});
+  return{id:'thunderbird',holes,colliders,baskets,water:[],bounds:THUNDERBIRD_BOUNDS,groundHeight:thunderbirdSurfaceHeight,groundNormal:normalAt,palette:{sky:0xd69b72,fog:0xd69b72,fogNear:140,fogFar:520},name:'Thunderbird Gardens',environment:{dressing,scenery:{...scenery,batches:[...earlyBatches,...scenery.batches]}}};
 }

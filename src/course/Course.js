@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { addBoulder } from './Boulder.js';
 import { createBin, createParkSign, createPicnicTable, createShelter, placeAsset } from './ParkAssets.js';
+import { addParkCommons } from './ParkCommons.js';
 import { makeBasket } from './Basket.js';
 import { addCourseDressing, addEnvironmentDetails } from './EnvironmentAssets.js';
 import { HOLE_DATA, COURSE_BOUNDS, WATER, distanceToSegment, inPolygon } from './Layout.js';
@@ -189,8 +190,9 @@ export function buildCourse(scene) {
   environment = addEnvironmentDetails(scene, holes.slice(0, 9), colliders);
   holes.slice(9).forEach(buildHole);
   strip(scene, [4, 244], [10, 235], 1.7, sand, .021);
-  environment.dressing = addCourseDressing(scene, holes, colliders, environment.placements);
-  return { holes, colliders, baskets, water: WATER, environment,
+  environment.commons = addParkCommons(scene, holes, colliders, environment.placements);
+  environment.dressing = addCourseDressing(scene, holes, colliders, [...environment.placements, ...environment.commons.placements]);
+  return { id: 'tocobaga', holes, colliders, baskets, water: WATER, environment,
     bounds: COURSE_BOUNDS, groundHeight: () => 0, groundNormal: () => new THREE.Vector3(0, 1, 0),
     palette: { sky: 0x9cc9e2, fog: 0x9cc9e2 }, name: COURSE_NAME };
 }

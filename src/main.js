@@ -1,10 +1,15 @@
 import * as THREE from 'three';
 import { buildCourse } from './course/Course.js';
 import { buildThunderbirdCourse } from './course/ThunderbirdCourse.js';
+import { buildCedarCourse } from './course/CedarCourse.js';
 import { collideBoulder } from './course/Boulder.js';
 import { Disc, DISCS } from './entities/Disc.js';
 import { HUD } from './ui/HUD.js';
 import { HolePreviewController } from './camera/HolePreviewController.js';
+import { MODES, canRestart, canPost, recordedThrows } from './game/runMode.js';
+import { createPersonalStore } from './game/personal.js';
+import { createRunSubmitter } from './game/runSubmit.js';
+import { fetchBoard, submitRun } from './game/leaderboardApi.js';
 
 const clamp = THREE.MathUtils.clamp;
 const RAD2DEG = 180 / Math.PI;
@@ -41,13 +46,20 @@ sun.shadow.camera.top = 90;
 sun.shadow.camera.bottom = -90;
 scene.add(sun);
 
-const tocobagaRoot = new THREE.Group(), thunderbirdRoot = new THREE.Group();
-scene.add(tocobagaRoot, thunderbirdRoot);
-const courses = { tocobaga: buildCourse(tocobagaRoot), thunderbird: buildThunderbirdCourse(thunderbirdRoot) };
+const tocobagaRoot = new THREE.Group(), thunderbirdRoot = new THREE.Group(), cedarRoot = new THREE.Group();
+scene.add(tocobagaRoot, thunderbirdRoot, cedarRoot);
+const courses = { tocobaga: buildCourse(tocobagaRoot), thunderbird: buildThunderbirdCourse(thunderbirdRoot), forest: buildCedarCourse(cedarRoot) };
+const courseRoots = { tocobaga: tocobagaRoot, thunderbird: thunderbirdRoot, forest: cedarRoot };
 thunderbirdRoot.visible = false;
+cedarRoot.visible = false;
 let course = courses.tocobaga;
 let holes = course.holes, colliders = course.colliders;
 let roundHoles = holes;
+let courseId = 'tocobaga';
+let runResult = null;
+let boardSeq = 0;
+const personal = createPersonalStore();
+const postRunScore = createRunSubmitter({ submit: submitRun, store: personal });
 const disc = new Disc(scene);
 
 const aimLine = new THREE.Line(
@@ -91,7 +103,12 @@ const state = {
   spinRate: 0,
   landingTime: 0,
   finished: false,
+  runMode: false,
+  runId: 0,
 };
+if (import.meta.env.DEV) window.__discState = state;
+// Lets dev-only browser tests force the post-round panel.
+Object.defineProperty(state, 'runResult', { get: () => runResult, set: v => { runResult = v; }, enumerable: false });
 
 const landingFlyover = new THREE.CatmullRomCurve3([
   new THREE.Vector3(-150, 34, 315),
@@ -103,6 +120,42 @@ const landingFlyover = new THREE.CatmullRomCurve3([
   new THREE.Vector3(15, 36, 300),
 ], true, 'centripetal');
 landingFlyover.arcLengthDivisions = 600;
+
+const thunderbirdLandingFlyover = new THREE.CatmullRomCurve3([
+  [-165, 28, -160],
+  [-190, 30, -65],
+  [-170, 32, 65],
+  [-105, 34, 155],
+  [-10, 32, 190],
+  [100, 34, 175],
+  [180, 30, 110],
+  [190, 28, 20],
+  [155, 30, -80],
+  [65, 32, -170],
+  [-70, 30, -185],
+].map(([x, height, z]) => new THREE.Vector3(x, courses.thunderbird.groundHeight(x, z) + height, z)), true, 'centripetal');
+thunderbirdLandingFlyover.arcLengthDivisions = 600;
+
+const forestLandingFlyover = new THREE.CatmullRomCurve3([
+  [-165, 28, -170],
+  [-185, 30, -80],
+  [-165, 32, 30],
+  [-110, 34, 145],
+  [-10, 32, 185],
+  [90, 34, 175],
+  [165, 30, 120],
+  [180, 28, 40],
+  [155, 30, -70],
+  [75, 32, -175],
+  [-60, 30, -185],
+].map(([x, height, z]) => new THREE.Vector3(x, courses.forest.groundHeight(x, z) + height, z)), true, 'centripetal');
+forestLandingFlyover.arcLengthDivisions = 600;
+
+const landingCameras = {
+  tocobaga: { curve: landingFlyover, center: new THREE.Vector3(0, 0, 40) },
+  thunderbird: { curve: thunderbirdLandingFlyover, center: new THREE.Vector3(0, 0, 0) },
+  forest: { curve: forestLandingFlyover, center: new THREE.Vector3(0, 0, 0) },
+};
 
 const touchControls = new Set();
 const touchAim = {
@@ -118,6 +171,10 @@ const hud = new HUD({
   onStartRound: startRound,
   onSelectCourse: selectCourse,
   onRestart: restartHole,
+  onBoardChange: () => refreshBoard(),
+  onQuitRun: quitRun,
+  onSubmitRun: name => postRun(name),
+  onRetryRun: () => postRun(runResult?.name ?? personal.getName() ?? ''),
   onNextHole: nextHole,
   onToggleView: toggleCameraView,
   onSelectDisc: selectDisc,
@@ -309,17 +366,27 @@ function throwDisc() {
 
 function selectCourse(id) {
   if (!courses[id] || !state.showLanding) return;
+  const changed = course !== courses[id];
+  courseId = id;
   course = courses[id]; holes = course.holes; colliders = course.colliders; roundHoles = holes;
-  tocobagaRoot.visible = id === 'tocobaga'; thunderbirdRoot.visible = id === 'thunderbird';
-  scene.background.setHex(course.palette.sky); scene.fog.color.setHex(course.palette.fog);
+  for (const [rootId, root] of Object.entries(courseRoots)) root.visible = rootId === id;
+  const palette = course.palette;
+  scene.background.setHex(palette.sky); scene.fog.color.setHex(palette.fog);
+  scene.fog.near = palette.fogNear ?? 110; scene.fog.far = palette.fogFar ?? 300;
+  hemi.color.setHex(palette.hemiSky ?? 0xffffff); hemi.groundColor.setHex(palette.hemiGround ?? 0x5d7545); hemi.intensity = palette.hemiIntensity ?? 2.1;
+  sun.color.setHex(palette.sun ?? 0xfff3d0); sun.intensity = palette.sunIntensity ?? 2.4; sun.position.set(...(palette.sunPosition ?? [42, 90, 30]));
   state.lie.copy(holes[0].tee); state.position.copy(holes[0].tee); pointAimAtBasket();
+  if (changed && state.showLanding) { state.landingTime = 0; state.cameraSnap = true; }
   return holes;
 }
 
-function startRound(format = 'all') {
+function startRound(format = 'all', mode = MODES.FREE) {
   if (!state.showLanding) return;
   roundHoles = format === 'front' ? holes.slice(0, 9) : format === 'back' ? holes.slice(9) : holes;
   state.roundFormat = format;
+  state.runMode = mode === MODES.RUN;
+  state.runId++;
+  runResult = null;
   state.scores = roundHoles.map(() => null);
   startHole(0);
 }
@@ -362,7 +429,7 @@ function startHole(index) {
 }
 
 function restartHole() {
-  if (state.showLanding) return;
+  if (state.showLanding || !canRestart(state.runMode ? MODES.RUN : MODES.FREE)) return;
   state.scores[state.holeIndex] = null;
   startHole(state.holeIndex);
 }
@@ -372,6 +439,8 @@ function nextHole() {
   if (!state.finished) return;
   if (state.holeIndex + 1 < roundHoles.length) {
     startHole(state.holeIndex + 1);
+  } else if (state.runMode) {
+    returnToTitle();
   } else {
     state.scores = roundHoles.map(() => null);
     startHole(0);
@@ -391,9 +460,81 @@ function finishHole() {
   disc.resetTrail();
   state.spinRate = 0;
   state.bank = 0;
-  state.scores[state.holeIndex] = state.throws;
+  state.scores[state.holeIndex] = state.runMode ? recordedThrows(state.throws) : state.throws;
   const last = state.holeIndex + 1 >= roundHoles.length;
+  if (last && state.runMode) completeRun();
   hud.toast(last ? 'Round complete!' : 'Chains! Hole complete.');
+}
+
+function returnToTitle() {
+  preview.skip();
+  if (isMouseCaptured()) document.exitPointerLock?.();
+  runResult = null;
+  state.runMode = false;
+  state.runId++;
+  state.showLanding = true;
+  state.finished = false;
+  state.mode = 'aiming';
+  state.charging = false;
+  state.power = 0;
+  state.velocity.set(0, 0, 0);
+  roundHoles = holes;
+  state.scores = holes.map(() => null);
+  state.holeIndex = 0;
+  state.lie.copy(holes[0].tee);
+  state.position.copy(holes[0].tee);
+  state.landingTime = 0;
+  state.cameraSnap = true;
+  touchControls.clear();
+  disc.resetTrail();
+  pointAimAtBasket();
+  updateHUD();
+  refreshBoard();
+}
+
+function quitRun() {
+  if (!state.runMode || state.showLanding) return;
+  if (!confirm('Quit this run? Your score will not be posted.')) return;
+  returnToTitle();
+}
+
+// While the name prompt or the post is up, the N key must not throw the finished run away.
+// Clicking "Back to title" stays possible: that is a deliberate choice.
+function namePromptBlocksLeaving() {
+  return state.runMode && state.finished && state.holeIndex + 1 >= roundHoles.length
+    && (runResult?.phase === 'name' || runResult?.phase === 'posting');
+}
+
+function completeRun() {
+  const name = personal.getName();
+  if (name) postRun(name);
+  else runResult = { phase: 'name' };
+}
+
+async function postRun(name) {
+  if (!state.runMode || !name || !canPost(runResult)) return;
+  const runId = state.runId;
+  runResult = { phase: 'posting', name };
+  updateHUD();
+  const throws = state.scores.reduce((sum, score) => sum + score, 0);
+  const parDiff = throws - roundHoles.reduce((sum, h) => sum + h.par, 0);
+  const result = await postRunScore({ name, course: courseId, format: state.roundFormat, holes: [...state.scores], parDiff });
+  if (runId !== state.runId) return; // run was abandoned while the request was in flight
+  runResult = { ...result, name: name.trim() };
+  updateHUD();
+  refreshBoard();
+}
+
+async function refreshBoard() {
+  const seq = ++boardSeq;
+  const [id, format] = [hud.courseId, hud.roundFormat];
+  hud.renderBoard({ status: 'loading' });
+  try {
+    const rows = await fetchBoard(id, format);
+    if (seq === boardSeq) hud.renderBoard({ status: 'ok', rows });
+  } catch {
+    if (seq === boardSeq) hud.renderBoard({ status: 'offline' });
+  }
 }
 
 function updateSunTarget() {
@@ -405,15 +546,19 @@ function updateSunTarget() {
 function collideObstacles() {
   for (const tree of colliders) {
     if (tree.kind === 'rock') {
+      // Basket shelves are represented in the course heightfield, including
+      // their sloped sides; resolving them again as ellipsoids causes jitter.
+      if (tree.role === 'basket-shelf') continue;
       if (collideBoulder(state.position, state.velocity, tree, DISC_RADIUS)) hud.toast('Rock kick');
       continue;
     }
     const dx = state.position.x - tree.x;
     const dz = state.position.z - tree.z;
     const d2 = dx * dx + dz * dz;
-    const inCanopy = state.position.y > (tree.canopyBottom ?? 1.8) && state.position.y < tree.height;
+    const baseY = tree.baseY ?? 0, canopyBottom = baseY + (tree.canopyBottom ?? 1.8), treeTop = baseY + tree.height;
+    const inCanopy = state.position.y > canopyBottom && state.position.y < treeTop;
     const radius = (inCanopy ? tree.canopyRadius : tree.trunkRadius) + DISC_RADIUS;
-    if (state.position.y < tree.height && d2 < radius * radius) {
+    if (state.position.y < treeTop && d2 < radius * radius) {
       const d = Math.max(Math.sqrt(d2), 0.001);
       const normal = new THREE.Vector3(dx / d, 0, dz / d);
       state.position.x = tree.x + normal.x * radius;
@@ -564,11 +709,11 @@ function updateCamera(dt) {
 
   if (state.showLanding) {
     const loop = (state.landingTime % 28) / 28;
-    desired = landingFlyover.getPointAt(loop);
-    const ahead = landingFlyover.getPointAt((loop + 0.045) % 1);
-    const courseCenter = new THREE.Vector3(0, 0.7, 40);
-    target = ahead.lerp(courseCenter, 0.62);
-    target.y = 1.2 + Math.sin(state.landingTime * 0.35) * 0.25;
+    const landing = landingCameras[course.id] || landingCameras.tocobaga;
+    desired = landing.curve.getPointAt(loop);
+    const ahead = landing.curve.getPointAt((loop + 0.045) % 1);
+    target = ahead.lerp(landing.center, 0.62);
+    target.y = course.groundHeight(target.x, target.z) + 1.2 + Math.sin(state.landingTime * 0.35) * 0.25;
   } else if (state.mode === 'flying') {
     const vel = new THREE.Vector3(Math.sin(state.flightHeading), 0, Math.cos(state.flightHeading));
     desired = state.position.clone().addScaledVector(vel, -8.5).add(new THREE.Vector3(0, 4.2, 0));
@@ -609,12 +754,12 @@ function updateCamera(dt) {
 function updateAimLine() {
   const dir = aimDirection();
   const start = state.lie.clone();
-  start.y = 0.12;
+  start.y = course.groundHeight(start.x, start.z) + .12;
   const end = start.clone().addScaledVector(dir, 16 + state.power * 20);
-  end.y += Math.sin(state.elevation) * 3.0;
+  end.y = course.groundHeight(end.x, end.z) + .12 + Math.sin(state.elevation) * 3.0;
   aimLine.geometry.setFromPoints([start, end]);
   aimLine.visible = state.mode === 'aiming' && state.cameraView === 'third' && !state.finished;
-  basketBeacon.position.set(hole().basket.x, 0.035, hole().basket.z);
+  basketBeacon.position.set(hole().basket.x, course.groundHeight(hole().basket.x, hole().basket.z) + .035, hole().basket.z);
   basketBeacon.visible = !state.showLanding && !state.finished;
   basketBeacon.rotation.z += 0.01;
 }
@@ -646,6 +791,8 @@ function updateHUD() {
     charging: state.charging,
     powerRising: state.powerRising,
     finished: state.finished,
+    runMode: state.runMode,
+    runResult,
   });
 }
 
@@ -726,6 +873,7 @@ window.addEventListener('wheel', (e) => {
 }, { passive: true });
 
 window.addEventListener('keydown', (e) => {
+  if (e.target instanceof HTMLInputElement) return;
   if (!e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
     const type = { '1': 'driver', '2': 'midrange', '3': 'putter' }[e.key];
     if (type) selectDisc(type);
@@ -733,11 +881,11 @@ window.addEventListener('keydown', (e) => {
   if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
   if (state.showLanding && (e.code === 'Enter' || e.code === 'Space')) {
     e.preventDefault();
-    startRound(hud.roundFormat);
+    startRound(hud.roundFormat, hud.runMode);
   }
   if (e.key === 'r' || e.key === 'R') restartHole();
   if (e.key === 'v' || e.key === 'V') toggleCameraView();
-  if (e.key === 'n' || e.key === 'N') nextHole();
+  if ((e.key === 'n' || e.key === 'N') && !namePromptBlocksLeaving()) nextHole();
 });
 
 window.addEventListener('resize', () => {
@@ -753,4 +901,5 @@ updateAimLine();
 updateHUD();
 disc.update(state.position, state.bank, state.spin, false);
 renderer.render(scene, camera);
+refreshBoard();
 renderer.setAnimationLoop(animate);

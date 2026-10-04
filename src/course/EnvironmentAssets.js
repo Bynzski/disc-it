@@ -112,7 +112,7 @@ export function environmentClearance(x, z, radius, holes, colliders) {
   });
 }
 
-function bakeAssets(scene, assets, name) {
+export function bakeAssets(scene, assets, name) {
   const parts = new Map();
   for (const asset of assets) {
     asset.updateMatrixWorld(true);
