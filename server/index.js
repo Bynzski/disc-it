@@ -9,7 +9,8 @@ fs.mkdirSync(path.join(root, 'data'), { recursive: true });
 const db = openDb(process.env.DB_PATH || path.join(root, 'data', 'scores.db'));
 const app = createApp({ db, staticDir: path.join(root, 'dist') });
 const port = Number(process.env.PORT) || 3000;
-const server = app.listen(port, () => console.log(`Disc It server on http://localhost:${port}`));
+const host = process.env.BIND_HOST;
+const server = app.listen(port, host, () => console.log(`Disc It server on http://${host || 'localhost'}:${port}`));
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => server.close(() => { db.close(); process.exit(0); }));

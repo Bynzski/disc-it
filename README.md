@@ -55,6 +55,15 @@ ExecStart=/usr/bin/node server/index.js
 Restart=on-failure
 ```
 
+## Production deployment
+
+Production game and leaderboard: **https://gyute.fyi/disk-it/**.
+Pushes to `main` trigger `.github/workflows/deploy.yml`, which uses a dedicated restricted SSH key to deploy the exact commit on the VPS. Other branches do not deploy production. The build runs server/hosting tests before switching the service.
+
+VPS builds use `VITE_BASE_PATH=/disk-it/`. Default `npm run build` still uses `/`, preserving the separate Vercel frontend; that Vercel deployment does not host this SQLite API. Caddy strips `/disk-it` before forwarding to Express. The VPS sets `BIND_HOST=127.0.0.1`, `PORT=8082`, and `DB_PATH=/data/scores.db`; persistent storage is bind-mounted from `/var/lib/disc-it` and must be writable by UID 1000.
+
+Operational configuration, recovery and SQLite-safe backups are documented in the private `Bynzski/gyute-lab` repository. Do not delete the data directory during deployment. Online backups use SQLite's backup API, not a bare copy of a WAL-mode database.
+
 ## Tests
 
 Browser tests require Playwright with Chromium and a development server at `http://localhost:5173`. Install Playwright separately and set `PLAYWRIGHT_PATH` to its module path (the scripts otherwise fall back to the original development machine's installation).

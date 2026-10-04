@@ -1,0 +1,35 @@
+name: Deploy production
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Configure deployment-only SSH identity
+        env:
+          DEPLOY_KEY: ${{ secrets.VPS_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/deploy_key"
+          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/deploy_key" "$HOME/.ssh/known_hosts"
+      - name: Deploy exact pushed commit
+        run: >-
+          ssh -i "$HOME/.ssh/deploy_key"
+          -o BatchMode=yes -o StrictHostKeyChecking=yes
+          -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=6
+          ubuntu@15.204.255.170 "deploy $GITHUB_SHA"
+      - name: Verify public deployment
+        run: curl --retry 5 --retry-delay 3 --retry-all-errors -fsS https://gyute.fyi/disk-it/api/holes/tocobaga -o /dev/null
+      - name: Remove temporary SSH identity
+        if: always()
+        run: rm -f "$HOME/.ssh/deploy_key"
